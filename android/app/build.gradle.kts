@@ -42,6 +42,10 @@ android {
         targetSdk = 35
         versionCode = (project.findProperty("routebotVersionCode") as String?)?.toIntOrNull() ?: 1
         versionName = project.findProperty("routebotVersionName") as String? ?: "1.0.0"
+        // Phone APKs only — drops x86/x86_64 emulator ABIs that bloated the universal APK.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     signingConfigs {
@@ -58,6 +62,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -122,7 +127,8 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
-    implementation(libs.mlkit.barcode)
+    // Pure-Java QR decoder — avoids ML Kit's multi-MB libbarhopper native libs.
+    implementation(libs.zxing.core)
 
     debugImplementation(libs.androidx.compose.ui.tooling.preview)
 }

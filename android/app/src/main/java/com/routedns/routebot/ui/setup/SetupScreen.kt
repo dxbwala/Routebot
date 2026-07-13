@@ -15,10 +15,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -231,13 +229,13 @@ fun SetupScreen(viewModel: SetupViewModel, onComplete: () -> Unit) {
                 navigationIcon = {
                     if (uiState.pane != SetupPane.CREDENTIALS) {
                         IconButton(onClick = { viewModel.showPane(SetupPane.CREDENTIALS) }) {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = { showServerDialog = true }) {
-                        Icon(Icons.Filled.Language, contentDescription = "Server address")
+                        Icon(Icons.Filled.Settings, contentDescription = "Server address")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -334,11 +332,8 @@ private fun CredentialsPane(
             singleLine = true,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
-                IconButton(onClick = onTogglePasswordVisible) {
-                    Icon(
-                        imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                        contentDescription = "Toggle password visibility"
-                    )
+                TextButton(onClick = onTogglePasswordVisible) {
+                    Text(if (passwordVisible) "Hide" else "Show")
                 }
             },
             modifier = Modifier.fillMaxWidth()
