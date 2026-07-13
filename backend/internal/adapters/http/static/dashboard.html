@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteBot Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script src="/static/qrcode.min.js"></script>
   <style>
     :root {
       --bg: #0b1117;
@@ -102,7 +102,20 @@
     .meta { color: var(--muted); font-size: 0.85rem; }
 
     .shell { display: none; min-height: 100vh; min-height: 100dvh; }
-    .shell.on { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+    .shell.on {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+    .shell-body {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      width: 100%;
+    }
     .mobile-bar {
       display: none;
       position: sticky;
@@ -114,12 +127,16 @@
       background: color-mix(in srgb, var(--panel) 92%, black 8%);
       border-bottom: 1px solid var(--line);
       backdrop-filter: blur(8px);
+      flex: 0 0 auto;
     }
     .mobile-bar .title {
       font-family: "IBM Plex Serif", Georgia, serif;
       font-size: 1.15rem;
       flex: 1;
       min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .sidebar-backdrop {
       display: none;
@@ -127,6 +144,7 @@
       inset: 0;
       background: rgba(0, 0, 0, 0.55);
       z-index: 50;
+      -webkit-tap-highlight-color: transparent;
     }
     .sidebar {
       background: color-mix(in srgb, var(--panel) 96%, black 4%);
@@ -137,9 +155,13 @@
       gap: 10px;
       min-height: 100vh;
       min-height: 100dvh;
+      max-height: 100vh;
+      max-height: 100dvh;
       position: sticky;
       top: 0;
       overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
     .brand {
       font-family: "IBM Plex Serif", Georgia, serif;
@@ -217,6 +239,7 @@
       padding: 18px 20px calc(48px + var(--safe-bottom));
       min-width: 0;
       width: 100%;
+      max-width: 1400px;
       overflow-x: hidden;
     }
     .topbar {
@@ -235,6 +258,7 @@
       padding: 16px;
       margin-bottom: 14px;
       min-width: 0;
+      overflow: hidden;
     }
     .panel h3 { margin: 0 0 12px; font-size: 1rem; }
     .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -244,17 +268,18 @@
       gap: 8px 10px;
       font-size: 0.92rem;
     }
-    .kv span { min-width: 0; word-break: break-word; }
+    .kv span { min-width: 0; word-break: break-word; overflow-wrap: anywhere; }
     .kv span:first-child { color: var(--muted); }
     .tabs {
       display: flex;
       gap: 6px;
       flex-wrap: nowrap;
       margin: 0 -4px 12px;
-      padding: 2px 4px 8px;
+      padding: 2px 4px 10px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
+      scroll-snap-type: x proximity;
     }
     .tab {
       background: transparent;
@@ -262,6 +287,7 @@
       border: 1px solid var(--line);
       white-space: nowrap;
       flex: 0 0 auto;
+      scroll-snap-align: start;
     }
     .tab.active { background: #243447; color: var(--text); border-color: #3a516b; }
     .table-wrap {
@@ -270,6 +296,7 @@
       -webkit-overflow-scrolling: touch;
       margin: 0 -2px;
       padding-bottom: 4px;
+      overscroll-behavior-x: contain;
     }
     table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 0.88rem; }
     th, td {
@@ -278,6 +305,7 @@
       border-bottom: 1px solid #243041;
       vertical-align: top;
       word-break: break-word;
+      overflow-wrap: anywhere;
     }
     th { color: var(--muted); font-weight: 600; white-space: nowrap; }
     .empty { color: var(--muted); padding: 18px 4px; }
@@ -291,6 +319,7 @@
     #qr {
       display: inline-block;
       max-width: min(280px, 100%);
+      width: 100%;
       height: auto;
       padding: 12px;
       background: #fff;
@@ -322,6 +351,7 @@
     .ussd-step-row input {
       flex: 1 1 auto;
       margin-bottom: 0;
+      min-width: 0;
     }
     .ussd-step-row button {
       flex: 0 0 auto;
@@ -348,8 +378,13 @@
     .devices-layout.selected-mobile #fleetPanel { display: none; }
     .devices-layout.selected-mobile .back-devices { display: inline-flex; }
 
+    @media (max-width: 1100px) {
+      .main { max-width: none; }
+      .cmd-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+    }
+
     @media (max-width: 900px) {
-      .shell.on { grid-template-columns: 1fr; }
+      .shell-body { display: block; min-height: 0; }
       .mobile-bar { display: flex; }
       .sidebar-backdrop.open { display: block; }
       .sidebar {
@@ -357,30 +392,79 @@
         top: 0;
         left: 0;
         bottom: 0;
-        width: min(var(--sidebar-w), 86vw);
+        width: min(var(--sidebar-w), calc(100vw - 48px));
+        max-width: 320px;
         z-index: 60;
         transform: translateX(-105%);
-        transition: transform 0.2s ease;
+        transition: transform 0.22s ease;
         border-right: 1px solid var(--line);
         box-shadow: 12px 0 40px rgba(0, 0, 0, 0.35);
+        padding-top: calc(18px + var(--safe-top));
+        min-height: 100vh;
+        min-height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
       }
       .shell.nav-open .sidebar { transform: translateX(0); }
-      .main { padding: 14px 12px calc(28px + var(--safe-bottom)); }
+      .main {
+        padding: 12px 12px calc(28px + var(--safe-bottom));
+        max-width: none;
+      }
       .grid-2 { grid-template-columns: 1fr; }
       .device-list { max-height: none; }
       .panel { padding: 14px 12px; border-radius: 12px; }
       .cmd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .brand { display: none; }
+      #viewDevices > .topbar { display: none; }
+      #viewPair > .topbar,
+      #viewWebhooks > .topbar { margin-bottom: 10px; }
+      .devices-layout:not(.selected-mobile) #deviceDetail { display: none; }
+      .ussd-step-actions button { flex: 1 1 calc(50% - 4px); }
+      #sendSmsBtn,
+      #sendUssdBtn,
+      #sendCustomBtn,
+      #createHookBtn,
+      #qrBtn { width: 100%; }
+      .pair-panel { max-width: none !important; }
+      .sim-card { flex: 1 1 100%; min-width: 0; }
     }
 
     @media (max-width: 560px) {
-      .auth { width: calc(100% - 24px); margin: 16px auto; padding: 18px 14px; }
+      .auth { width: calc(100% - 20px); margin: 12px auto; padding: 16px 14px; }
+      .auth .row { flex-direction: column; align-items: stretch; }
+      .auth .row button { width: 100%; min-width: 0; }
       .kv { grid-template-columns: 1fr; gap: 2px 0; }
       .kv span:first-child { margin-top: 6px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
-      .cmd-grid { grid-template-columns: 1fr 1fr; }
-      table { min-width: 460px; font-size: 0.82rem; }
+      .cmd-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      table { min-width: 420px; font-size: 0.8rem; }
       th, td { padding: 8px 6px; }
       .row > button { flex: 1 1 calc(50% - 4px); }
+      .topbar { gap: 8px; }
+      .tabs { margin-left: -8px; margin-right: -8px; padding-left: 8px; padding-right: 8px; }
+      .ussd-step-actions { flex-direction: column; }
+      .ussd-step-actions button { width: 100%; flex: 1 1 auto; }
+    }
+
+    @media (max-width: 380px) {
+      .cmd-grid { grid-template-columns: 1fr; }
+      .row > button { flex: 1 1 100%; }
+      table { min-width: 360px; }
+    }
+
+    /* Short landscape phones / small tablets */
+    @media (max-height: 480px) and (orientation: landscape) {
+      .mobile-bar { padding-top: 8px; padding-bottom: 8px; }
+      .sidebar { padding-top: 12px; }
+      .device-list { max-height: min(40vh, 220px); }
+      .auth { margin: 12px auto; }
+    }
+
+    @media (min-width: 901px) and (max-width: 1100px) {
+      :root { --sidebar-w: 240px; }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .tab, .nav-btn, .device-item { min-height: 44px; }
     }
   </style>
 </head>
@@ -389,7 +473,7 @@
     <h1>RouteBot</h1>
     <p class="sub">Sign in to manage devices, send commands, and view live telemetry.</p>
     <label for="email">Email</label>
-    <input id="email" type="email" autocomplete="username" value="admin@routedns.io" />
+    <input id="email" type="email" autocomplete="username" />
     <label for="password">Password</label>
     <input id="password" type="password" autocomplete="current-password" />
     <div class="row">
@@ -401,11 +485,12 @@
 
   <div class="shell" id="appView">
     <div class="mobile-bar" id="mobileBar">
-      <button class="icon-btn" id="menuBtn" type="button" aria-label="Open menu">☰</button>
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">☰</button>
       <div class="title" id="mobileTitle">Devices</div>
       <button class="icon-btn secondary" id="mobileRefreshBtn" type="button" aria-label="Refresh">↻</button>
     </div>
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="shell-body">
     <aside class="sidebar" id="sidebar">
       <div class="brand">RouteBot</div>
       <div class="sidebar-nav">
@@ -531,7 +616,7 @@
 
       <div id="viewPair" class="hidden">
         <div class="topbar"><h2>Pair device</h2></div>
-        <div class="panel" style="max-width:520px;width:100%">
+        <div class="panel pair-panel" style="max-width:520px;width:100%">
           <label for="deviceName">Device name (optional)</label>
           <input id="deviceName" type="text" placeholder="Warehouse phone 1" />
           <div class="row">
@@ -569,6 +654,7 @@
         </div>
       </div>
     </section>
+    </div>
   </div>
 
   <script>
@@ -776,7 +862,11 @@
     function switchTab(tab) {
       state.tab = tab;
       document.querySelectorAll('#detailTabs .tab').forEach((t) => {
-        t.classList.toggle('active', t.dataset.tab === tab);
+        const on = t.dataset.tab === tab;
+        t.classList.toggle('active', on);
+        if (on && typeof t.scrollIntoView === 'function') {
+          t.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
       });
       $('tabCommands').classList.toggle('hidden', tab !== 'commands');
       $('tabHealth').classList.toggle('hidden', tab !== 'health');
@@ -802,6 +892,11 @@
     function setNavOpen(open) {
       $('appView').classList.toggle('nav-open', open);
       $('sidebarBackdrop').classList.toggle('open', open);
+      const menuBtn = $('menuBtn');
+      if (menuBtn) {
+        menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      }
       document.body.style.overflow = open ? 'hidden' : '';
     }
 
@@ -813,6 +908,16 @@
       const layout = $('devicesLayout');
       if (!layout) return;
       layout.classList.toggle('selected-mobile', Boolean(state.selectedId) && isMobile());
+      if (state.selectedId && isMobile()) {
+        const d = state.devices.find((x) => x.id === state.selectedId);
+        setMobileTitle(d?.name || d?.device_name || 'Device');
+      } else if (!$('viewPair').classList.contains('hidden')) {
+        setMobileTitle('Pair device');
+      } else if (!$('viewWebhooks').classList.contains('hidden')) {
+        setMobileTitle('Webhooks');
+      } else {
+        setMobileTitle('Devices');
+      }
     }
 
     function setMobileTitle(text) {
@@ -1183,7 +1288,13 @@
     $('menuBtn').onclick = () => setNavOpen(!$('appView').classList.contains('nav-open'));
     $('sidebarBackdrop').onclick = () => setNavOpen(false);
     $('backDevicesBtn').onclick = () => clearSelectedDevice();
-    window.addEventListener('resize', () => updateDevicesMobileLayout());
+    window.addEventListener('resize', () => {
+      updateDevicesMobileLayout();
+      if (!isMobile()) setNavOpen(false);
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') setNavOpen(false);
+    });
     document.querySelectorAll('.nav-btn[data-view]').forEach((b) => {
       b.onclick = () => switchView(b.dataset.view);
     });
@@ -1316,6 +1427,9 @@
     $('qrBtn').onclick = async () => {
       setStatus($('pairStatus'), 'Creating token…');
       try {
+        if (typeof QRCode === 'undefined' || typeof QRCode.toCanvas !== 'function') {
+          throw new Error('QR library failed to load — refresh and try again');
+        }
         const data = await api('/enrollment/tokens', {
           method: 'POST',
           body: JSON.stringify({ device_name: $('deviceName').value.trim() }),

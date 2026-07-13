@@ -62,6 +62,15 @@ func NewRouter(d Deps) *fiber.App {
 		c.Set("Content-Type", "text/html; charset=utf-8")
 		return c.Send(b)
 	})
+	app.Get("/static/qrcode.min.js", func(c fiber.Ctx) error {
+		b, err := staticFS.ReadFile("static/qrcode.min.js")
+		if err != nil {
+			return response.Fail(c, fiber.StatusNotFound, "not_found", "asset missing")
+		}
+		c.Set("Content-Type", "application/javascript; charset=utf-8")
+		c.Set("Cache-Control", "public, max-age=86400")
+		return c.Send(b)
+	})
 
 	authH := handlers.NewAuthHandler(d.Auth)
 	deviceH := handlers.NewDeviceHandler(d.Devices)
