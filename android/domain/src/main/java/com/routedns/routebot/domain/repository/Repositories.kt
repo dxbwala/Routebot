@@ -55,7 +55,8 @@ interface AuthRepository {
 
 interface AgentApiRepository {
     suspend fun sendHeartbeat(heartbeat: DeviceHeartbeat): Result<Unit>
-    suspend fun sendSms(message: SmsMessage): Result<Unit>
+    suspend fun sendSms(message: SmsMessage): Result<SmsMessage>
+    suspend fun updateSmsStatus(smsId: String, status: String, deliveredAt: String?): Result<Unit>
     suspend fun sendOtp(event: OtpEvent): Result<Unit>
     suspend fun sendNotification(event: NotificationEvent): Result<Unit>
     suspend fun sendCall(event: CallEvent): Result<Unit>
@@ -66,6 +67,7 @@ interface AgentApiRepository {
         file: File,
         contentType: String
     ): Result<Unit>
+    suspend fun reportCrash(report: com.routedns.routebot.domain.model.CrashReport): Result<Unit>
     suspend fun flushQueue()
 }
 

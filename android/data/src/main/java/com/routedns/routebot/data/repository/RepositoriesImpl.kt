@@ -167,8 +167,54 @@ class AgentApiRepositoryImpl @Inject constructor(
             api.heartbeat(key, heartbeat)
         }
 
-    override suspend fun sendSms(message: SmsMessage): Result<Unit> =
-        postOrQueue(EventTypes.SMS, message) { key, api -> api.ingestSms(key, message) }
+    override suspend fun sendSms(message: SmsMessage): Result<SmsMessage> = withContext(Dispatchers.IO) {
+        val key = apiKey()
+        val api = api()
+        if (key == null || api == null) {
+            offlineQueue.enqueue(EventTypes.SMS, jsonProvider.json.encodeToString(message))
+            return@withContext Result.Error("Offline — queued")
+        }
+        try {
+            val response = api.ingestSms(key, message)
+            val created = response.data?.get("sms")
+            if (response.success && created != null) Result.Success(created)
+            else Result.Error(response.error?.message ?: "Request failed")
+        } catch (e: Exception) {
+            offlineQueue.enqueue(EventTypes.SMS, jsonProvider.json.encodeToString(message))
+            RouteBotLog.w("api_enqueue_offline", mapOf("type" to EventTypes.SMS), e)
+            Result.Error("Offline — queued", e)
+        }
+    }
+
+    override suspend fun updateSmsStatus(smsId: String, status: String, deliveredAt: String?): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val key = apiKey() ?: return@withContext Result.Error("API key missing")
+                val api = api() ?: return@withContext Result.Error("API not configured")
+                val response = api.updateSmsStatus(
+                    key, smsId,
+                    com.routedns.routebot.domain.model.SmsStatusUpdateRequest(status, deliveredAt)
+                )
+                if (response.success) Result.Success(Unit)
+                else Result.Error(response.error?.message ?: "Status update failed")
+            } catch (e: Exception) {
+                RouteBotLog.w("sms_status_update_failed", mapOf("sms_id" to smsId), e)
+                Result.Error(e.message ?: "Status update failed", e)
+            }
+        }
+
+    override suspend fun reportCrash(report: com.routedns.routebot.domain.model.CrashReport): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val key = apiKey() ?: return@withContext Result.Error("API key missing")
+                val api = api() ?: return@withContext Result.Error("API not configured")
+                val response = api.reportCrash(key, report)
+                if (response.success) Result.Success(Unit)
+                else Result.Error(response.error?.message ?: "Crash report failed")
+            } catch (e: Exception) {
+                Result.Error(e.message ?: "Crash report failed", e)
+            }
+        }
 
     override suspend fun sendOtp(event: OtpEvent): Result<Unit> =
         postOrQueue(EventTypes.OTP, event) { key, api -> api.ingestOtp(key, event) }

@@ -16,6 +16,7 @@ cp .env.example .env
 sed -i '' "s#^JWT_SECRET=.*#JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')#" .env
 sed -i '' "s#^DEVICE_API_KEY_PEPPER=.*#DEVICE_API_KEY_PEPPER=$(openssl rand -hex 32)#" .env
 sed -i '' "s#^WEBHOOK_HMAC_SECRET=.*#WEBHOOK_HMAC_SECRET=$(openssl rand -hex 32)#" .env
+sed -i '' "s#^REQUEST_SIGNING_KEY=.*#REQUEST_SIGNING_KEY=$(openssl rand -hex 32)#" .env
 sed -i '' "s#^POSTGRES_PASSWORD=.*#POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9')#" .env
 sed -i '' "s#^REDIS_PASSWORD=.*#REDIS_PASSWORD=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9')#" .env
 chmod 600 .env
@@ -88,7 +89,18 @@ Point the agent at `http://localhost:8080` in that mode (API exposed directly). 
 
 ## Media storage
 
-Files land under `MEDIA_STORAGE_PATH` (Compose volume `/data/media`). Soft-delete is tracked in `media_uploads.deleted_at`.
+Files land under `MEDIA_STORAGE_PATH` (Compose volume `/data/media`). Soft-delete is tracked in `media_uploads.deleted_at`. `media_type` includes `logs` (from the `upload_logs` remote command) alongside `audio`/`video`/`screenshot`.
+
+## Integration tests
+
+`backend/tests/integration` exercises the real Fiber app against real Postgres + Redis (register → login → device enrollment → signed heartbeat/SMS ingest → delivery status → dashboard read-back → replay rejection). Requires the same env vars as `cmd/api` (see `.env.example`); skips gracefully if the databases aren't reachable.
+
+```bash
+cd backend
+POSTGRES_HOST=localhost REDIS_ADDR=localhost:6379 go test ./tests/integration/... -v
+```
+
+CI runs this automatically with Postgres/Redis service containers — see [`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml).
 
 ## Android release builds
 
@@ -96,6 +108,9 @@ Files land under `MEDIA_STORAGE_PATH` (Compose volume `/data/media`). Soft-delet
 - `android/app/src/debug/res/xml/network_security_config.xml` overrides this for **debug** builds only, allowing cleartext to a local/LAN API for development. This override is never included in a release build (verified by inspecting `merged_res/release`).
 - Certificate pinning: configure pins via the Settings screen (stored via `SecureStorageRepository.saveCertificatePins`); leave empty to rely on standard CA trust.
 - Release builds are not yet signed with a production keystore — set up Play App Signing or a dedicated release keystore before publishing.
+- The local Room database is encrypted at rest with SQLCipher; the passphrase is generated once and stored in Android Keystore-backed `EncryptedSharedPreferences` (`DbPassphraseProvider`), never in plaintext.
+- Captured audio/video/screenshots are encrypted with an Android Keystore-backed AES-GCM key (hardware-backed where available) before upload, then deleted — the key itself never leaves the keystore or touches disk.
+- See [platform-limitations.md](architecture/platform-limitations.md) for the screenshot consent flow, video/CPU/SIM caveats, and SMS delivery report behavior.
 
 ## Production checklist
 
@@ -107,12 +122,17 @@ Files land under `MEDIA_STORAGE_PATH` (Compose volume `/data/media`). Soft-delet
 - [x] Postgres/Redis not published on host ports; Redis requires a password
 - [x] Rate limiting on auth/enrollment endpoints (nginx + app level)
 - [x] Android release builds disable cleartext traffic
+- [x] Request signing + replay protection on all agent REST endpoints
+- [x] Local Room database encrypted at rest (SQLCipher, Keystore-backed passphrase)
+- [x] Captured media encrypted with a Keystore-backed key (not a plaintext key file)
+- [x] Crash reporting (uncaught exception handler → persisted + uploaded next launch)
+- [x] SMS delivery reports (real sent/delivered callbacks, not hardcoded status)
+- [x] Integration test suite (real HTTP + Postgres + Redis) running in CI
 - [ ] Configure certificate pinning pins for your domain in the Android agent settings
 - [ ] Back up Postgres; retain Valkey as ephemeral presence cache
 - [ ] Configure webhook endpoints as HTTPS only
 - [ ] Sign Android release builds with a production keystore
 - [ ] Add structured metrics/tracing and log shipping
-- [ ] Expand automated test coverage (HTTP handlers, WS hub, Postgres repos)
 
 ## Android CI APK
 

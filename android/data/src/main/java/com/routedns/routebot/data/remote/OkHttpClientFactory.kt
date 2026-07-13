@@ -8,8 +8,11 @@ import okhttp3.CertificatePinner
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import okio.Buffer
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -71,7 +74,54 @@ class OkHttpClientFactory @Inject constructor(
             .pingInterval(30, TimeUnit.SECONDS)
             .apply { pinner?.let { certificatePinner(it) } }
             .addInterceptor(requestIdInterceptor)
+            .addInterceptor(RequestSigningInterceptor(secureStorage))
             .addInterceptor(logging)
             .build()
+    }
+}
+
+/**
+ * Signs every agent request (any request already carrying [Constants.HEADER_DEVICE_API_KEY])
+ * with HMAC-SHA256("timestamp.body", rawApiKey) and attaches [Constants.HEADER_TIMESTAMP] /
+ * [Constants.HEADER_SIGNATURE]. Combined with the per-request nonce in
+ * [Constants.HEADER_REQUEST_ID], the server verifies both signature and replay protection —
+ * see backend `middleware.DeviceAPIKey` / `DeviceService.VerifyRequestSignature`.
+ *
+ * The raw API key is the same secret the device received once at registration/enrollment and
+ * already holds in [SecureStorageRepository]; it is never sent over the wire again.
+ */
+private class RequestSigningInterceptor(
+    private val secureStorage: SecureStorageRepository
+) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
+        val request = chain.request()
+        if (request.header(Constants.HEADER_DEVICE_API_KEY) == null) {
+            return chain.proceed(request)
+        }
+        val apiKey = runBlocking { secureStorage.getApiKey() } ?: return chain.proceed(request)
+
+        val bodyBytes = request.body?.let { body ->
+            val buffer = Buffer()
+            body.writeTo(buffer)
+            buffer.readByteArray()
+        } ?: ByteArray(0)
+
+        val timestamp = System.currentTimeMillis() / 1000
+        val signature = sign(apiKey, timestamp, bodyBytes)
+
+        val signed = request.newBuilder()
+            .header(Constants.HEADER_TIMESTAMP, timestamp.toString())
+            .header(Constants.HEADER_SIGNATURE, signature)
+            .build()
+        return chain.proceed(signed)
+    }
+
+    private fun sign(secret: String, timestamp: Long, body: ByteArray): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+        mac.update(timestamp.toString().toByteArray(Charsets.UTF_8))
+        mac.update(".".toByteArray(Charsets.UTF_8))
+        val raw = mac.doFinal(body)
+        return raw.joinToString("") { "%02x".format(it) }
     }
 }

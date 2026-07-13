@@ -4,6 +4,10 @@ Endpoint: `GET /ws/agent?api_key=<device_api_key>`
 
 Also accepts `X-Device-API-Key` during the upgrade handshake.
 
+Note: request signing + replay protection (see [rest.md](rest.md)) applies to **REST** agent
+endpoints only, since the WS upgrade is a single handshake with no per-message body to sign.
+Commands delivered over WS are acked via REST (`/agent/commands/:id/ack`), which is signed.
+
 ## Lifecycle
 
 ```mermaid

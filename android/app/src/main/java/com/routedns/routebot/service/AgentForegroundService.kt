@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
 import javax.inject.Inject
 
@@ -43,6 +45,7 @@ class AgentForegroundService : Service() {
     @Inject lateinit var okHttpFactory: OkHttpClientFactory
     @Inject lateinit var deviceMonitor: DeviceMonitor
     @Inject lateinit var commandExecutor: CommandExecutor
+    @Inject lateinit var json: Json
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
@@ -95,9 +98,21 @@ class AgentForegroundService : Service() {
                 isCharging = snapshot.isCharging,
                 storageFreeMb = snapshot.storageFreeMb,
                 ramFreeMb = snapshot.ramFreeMb,
+                cpuUsage = snapshot.cpuUsage,
                 networkType = snapshot.networkType,
                 wifiSsid = snapshot.wifiSsid,
                 signalStrength = snapshot.signalStrength,
+                simInfo = json.parseToJsonElement(json.encodeToString(snapshot.simInfo)),
+                payload = json.parseToJsonElement(
+                    json.encodeToString(
+                        mapOf(
+                            "manufacturer" to snapshot.manufacturer,
+                            "model" to snapshot.model,
+                            "android_version" to snapshot.androidVersion,
+                            "app_version" to snapshot.appVersion
+                        )
+                    )
+                ),
                 reportedAt = Instant.now().toString()
             )
             agentApi.sendHeartbeat(heartbeat)

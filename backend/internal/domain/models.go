@@ -40,6 +40,7 @@ type Device struct {
 	DeviceUUID     string          `json:"device_uuid"`
 	Name           string          `json:"name"`
 	APIKeyHash     string          `json:"-"`
+	APIKeyEnc      string          `json:"-"`
 	APIKeyPrefix   string          `json:"api_key_prefix"`
 	Status         DeviceStatus    `json:"status"`
 	Manufacturer   string          `json:"manufacturer"`
@@ -150,18 +151,18 @@ const (
 
 // Supported remote command types.
 const (
-	CmdPing              = "ping"
-	CmdSync              = "sync"
-	CmdRestartServices   = "restart_services"
-	CmdRefreshConfig     = "refresh_config"
-	CmdClearCache        = "clear_cache"
-	CmdUploadLogs        = "upload_logs"
-	CmdUpdateConfig      = "update_config"
-	CmdRecordAudio       = "record_audio"
-	CmdRecordVideo       = "record_video"
-	CmdTakeScreenshot    = "take_screenshot"
-	CmdSendSMS           = "send_sms"
-	CmdUSSD              = "ussd"
+	CmdPing            = "ping"
+	CmdSync            = "sync"
+	CmdRestartServices = "restart_services"
+	CmdRefreshConfig   = "refresh_config"
+	CmdClearCache      = "clear_cache"
+	CmdUploadLogs      = "upload_logs"
+	CmdUpdateConfig    = "update_config"
+	CmdRecordAudio     = "record_audio"
+	CmdRecordVideo     = "record_video"
+	CmdTakeScreenshot  = "take_screenshot"
+	CmdSendSMS         = "send_sms"
+	CmdUSSD            = "ussd"
 )
 
 type Command struct {
@@ -184,6 +185,7 @@ const (
 	MediaAudio      MediaType = "audio"
 	MediaVideo      MediaType = "video"
 	MediaScreenshot MediaType = "screenshot"
+	MediaLogs       MediaType = "logs"
 )
 
 type MediaUpload struct {

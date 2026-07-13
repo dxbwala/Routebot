@@ -73,7 +73,7 @@ func main() {
 	tokens := auth.NewManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 
 	authSvc := service.NewAuthService(userRepo, refreshRepo, tokens, auditRepo, cfg.JWTRefreshTTL)
-	deviceSvc := service.NewDeviceService(deviceRepo, hbRepo, presence, cfg.DeviceAPIKeyPepper, cfg.OfflineThresholdSeconds, auditRepo, dispatcher)
+	deviceSvc := service.NewDeviceService(deviceRepo, hbRepo, presence, cfg.DeviceAPIKeyPepper, cfg.RequestSigningKey, cfg.RequestSignatureMaxSkew, cfg.OfflineThresholdSeconds, auditRepo, dispatcher)
 	eventSvc := service.NewEventService(smsRepo, otpRepo, notifRepo, callRepo, deviceRepo, dispatcher)
 	cmdSvc := service.NewCommandService(cmdRepo, deviceRepo, hub, auditRepo, dispatcher)
 	mediaSvc := service.NewMediaService(mediaRepo, deviceRepo, cfg.MediaStoragePath)

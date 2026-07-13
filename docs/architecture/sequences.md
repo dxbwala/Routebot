@@ -54,6 +54,66 @@ sequenceDiagram
   Dash->>API: GET_/media/:id
 ```
 
+## Agent request signing and replay protection
+
+```mermaid
+sequenceDiagram
+  participant Agent as Android_Agent
+  participant API as RouteBot_API
+  participant Redis as Valkey
+  Agent->>Agent: sign_timestamp_dot_body_with_raw_api_key
+  Agent->>API: POST_agent_endpoint_plus_signature_headers
+  API->>API: verify_api_key_hash
+  API->>API: decrypt_stored_api_key_copy
+  API->>API: recompute_HMAC_and_compare
+  API->>Redis: SETNX_device_id_request_id
+  alt nonce_already_seen
+    API-->>Agent: 401_replayed_request
+  else fresh
+    API->>API: process_request
+    API-->>Agent: 200_success
+  end
+```
+
+## Remote screenshot consent
+
+```mermaid
+sequenceDiagram
+  participant Dash as Dashboard
+  participant API as RouteBot_API
+  participant Agent as Android_Agent
+  participant User as Device_User
+  Dash->>API: POST_commands_take_screenshot
+  API->>Agent: WS_command
+  alt no_projection_grant_yet
+    Agent->>User: high_priority_notification
+    User->>Agent: tap_notification
+    Agent->>User: system_consent_dialog
+    User->>Agent: allow
+  end
+  Agent->>Agent: capture_encrypt_local
+  Agent->>API: POST_agent_media
+  Agent->>API: POST_agent_commands_ack
+  Agent->>Agent: delete_local_file
+```
+
+## SMS delivery report
+
+```mermaid
+sequenceDiagram
+  participant Agent as Android_Agent
+  participant OS as Android_Radio
+  participant API as RouteBot_API
+  Agent->>OS: SmsManager_sendTextMessage_with_PendingIntents
+  OS-->>Agent: sent_broadcast_near_instant
+  Agent->>API: POST_agent_sms_status_sent_or_failed
+  API-->>Agent: sms_id
+  OS-->>Agent: delivered_broadcast_later_or_never
+  opt delivery_confirmed
+    Agent->>API: POST_agent_sms_id_status_delivered
+  end
+```
+
 ## Webhook delivery
 
 ```mermaid

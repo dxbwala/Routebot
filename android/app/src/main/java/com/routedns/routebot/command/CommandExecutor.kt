@@ -28,6 +28,7 @@ import javax.inject.Singleton
 
 @Singleton
 class CommandExecutor @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val agentApi: AgentApiRepository,
     private val configRepository: ConfigRepository,
     private val secureStorage: SecureStorageRepository,
@@ -90,8 +91,9 @@ class CommandExecutor @Inject constructor(
                 val address = payload["address"]?.jsonPrimitive?.contentOrNull ?: error("address required")
                 val body = payload["body"]?.jsonPrimitive?.contentOrNull ?: error("body required")
                 val slot = payload["sim_slot"]?.jsonPrimitive?.intOrNull ?: 0
-                val sent = smsHelper.sendSms(address, body, slot).getOrThrow()
-                agentApi.sendSms(sent)
+                // SmsHelper posts the record itself (and later reports delivery status);
+                // it returns success/failure based on the radio-level "sent" result.
+                smsHelper.sendSms(address, body, slot).getOrThrow()
             }
             CommandTypes.USSD -> {
                 val payload = command.payload as? JsonObject ?: error("payload required")
@@ -116,7 +118,12 @@ class CommandExecutor @Inject constructor(
                 uploadAndDelete(media, MediaType.VIDEO, command.id)
             }
             CommandTypes.TAKE_SCREENSHOT -> {
-                error("Screenshot requires MediaProjection; grant via dashboard companion flow")
+                captureAndUploadScreenshot(command.id)
+            }
+            CommandTypes.UPLOAD_LOGS -> {
+                val logFile = com.routedns.routebot.common.RouteBotLog.getLogFile()
+                if (logFile == null || !logFile.exists()) error("no local logs available")
+                agentApi.uploadMedia("logs", command.id, logFile, "text/plain")
             }
             else -> error("Unknown command: ${command.command}")
         }
@@ -129,5 +136,58 @@ class CommandExecutor @Inject constructor(
     ) {
         agentApi.uploadMedia(type.name.lowercase(), commandId, media.file, media.contentType)
         mediaHelper.deleteAfterUpload(media.file)
+    }
+
+    /**
+     * Captures a screenshot via MediaProjection. Android requires interactive, one-time
+     * user consent for screen capture per app process — this cannot be granted silently or
+     * remotely. If no grant is held yet, this posts a high-priority notification prompting
+     * the user to tap it, waits (bounded) for the result, then proceeds. See
+     * [com.routedns.routebot.media.MediaProjectionHolder] for details.
+     */
+    private suspend fun captureAndUploadScreenshot(commandId: String) {
+        if (!com.routedns.routebot.media.MediaProjectionHolder.hasGrant()) {
+            val granted = requestScreenCaptureConsent()
+            if (!granted) error("Screen capture consent was not granted")
+        }
+        val resultCode = com.routedns.routebot.media.MediaProjectionHolder.resultCode
+            ?: error("Screen capture consent unavailable")
+        val data = com.routedns.routebot.media.MediaProjectionHolder.resultData
+            ?: error("Screen capture consent unavailable")
+
+        val projectionManager = androidx.core.content.ContextCompat.getSystemService(
+            appContext, android.media.projection.MediaProjectionManager::class.java
+        ) ?: error("MediaProjectionManager unavailable")
+        val projection = projectionManager.getMediaProjection(resultCode, data)
+
+        val metrics = appContext.resources.displayMetrics
+        val media = mediaHelper.captureScreenshot(projection, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi)
+            ?: error("Screenshot capture failed")
+        uploadAndDelete(media, MediaType.SCREENSHOT, commandId)
+    }
+
+    private suspend fun requestScreenCaptureConsent(): Boolean {
+        val deferred = com.routedns.routebot.media.MediaProjectionHolder.newPendingGrant()
+        showScreenCaptureConsentNotification()
+        return kotlinx.coroutines.withTimeoutOrNull(60_000) { deferred.await() } ?: false
+    }
+
+    private fun showScreenCaptureConsentNotification() {
+        val pending = android.app.PendingIntent.getActivity(
+            appContext, 0,
+            android.content.Intent(appContext, com.routedns.routebot.ui.screenshare.ScreenCaptureConsentActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val notification = androidx.core.app.NotificationCompat.Builder(appContext, com.routedns.routebot.common.Constants.AGENT_CHANNEL_ID)
+            .setContentTitle("Screenshot requested")
+            .setContentText("Tap to allow RouteBot to capture the screen")
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        androidx.core.app.NotificationManagerCompat.from(appContext)
+            .notify(com.routedns.routebot.common.Constants.SCREEN_CAPTURE_NOTIFICATION_ID, notification)
     }
 }

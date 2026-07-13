@@ -41,7 +41,10 @@ type HeartbeatRepository interface {
 type SMSRepository interface {
 	Create(ctx context.Context, msg *domain.SMSMessage) error
 	ListByDevice(ctx context.Context, deviceID uuid.UUID, limit int) ([]domain.SMSMessage, error)
-	UpdateStatus(ctx context.Context, id uuid.UUID, status string, deliveredAt *time.Time) error
+	// UpdateStatus updates status/deliveredAt only for the row owned by deviceID, so a device
+	// can only report delivery results for its own messages. Returns ErrNotFound-equivalent
+	// (via 0 rows affected) if the id/deviceID pair doesn't match.
+	UpdateStatus(ctx context.Context, id uuid.UUID, deviceID uuid.UUID, status string, deliveredAt *time.Time) (found bool, err error)
 }
 
 type OTPRepository interface {
@@ -92,6 +95,10 @@ type DevicePresence interface {
 	IsOnline(ctx context.Context, deviceID uuid.UUID) (bool, error)
 	Publish(ctx context.Context, channel string, payload []byte) error
 	Subscribe(ctx context.Context, channel string) (<-chan []byte, func(), error)
+	// CheckAndStoreNonce returns true the first time it sees this key within ttl,
+	// and false on any subsequent call with the same key (replay). Used to reject
+	// replayed signed agent requests.
+	CheckAndStoreNonce(ctx context.Context, key string, ttl time.Duration) (fresh bool, err error)
 }
 
 type WebhookDispatcher interface {

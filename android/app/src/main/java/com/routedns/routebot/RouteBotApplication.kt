@@ -7,6 +7,9 @@ import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.routedns.routebot.common.Constants
+import com.routedns.routebot.common.RouteBotLog
+import com.routedns.routebot.crash.CrashReporter
+import com.routedns.routebot.domain.repository.AgentApiRepository
 import com.routedns.routebot.worker.HealthSyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -15,6 +18,8 @@ import javax.inject.Inject
 class RouteBotApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var crashReporter: CrashReporter
+    @Inject lateinit var agentApi: AgentApiRepository
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -23,6 +28,9 @@ class RouteBotApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        RouteBotLog.init(this)
+        crashReporter.install()
+        crashReporter.reportPendingCrashIfAny(agentApi)
         createNotificationChannel()
         HealthSyncWorker.schedule(this)
     }

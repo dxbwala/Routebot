@@ -10,14 +10,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/routedns/routebot/backend/internal/domain"
 	"github.com/routedns/routebot/backend/internal/pkg/auth"
+	"github.com/routedns/routebot/backend/internal/pkg/crypto"
 	"github.com/routedns/routebot/backend/internal/ports"
 )
 
 type AuthService struct {
-	users    ports.UserRepository
-	refresh  ports.RefreshTokenRepository
-	tokens   *auth.Manager
-	audit    ports.AuditRepository
+	users      ports.UserRepository
+	refresh    ports.RefreshTokenRepository
+	tokens     *auth.Manager
+	audit      ports.AuditRepository
 	refreshTTL time.Duration
 }
 
@@ -116,13 +117,15 @@ func (s *AuthService) issue(ctx context.Context, user *domain.User) (*auth.Token
 }
 
 type DeviceService struct {
-	devices  ports.DeviceRepository
-	hb       ports.HeartbeatRepository
-	presence ports.DevicePresence
-	pepper   string
-	offline  time.Duration
-	audit    ports.AuditRepository
-	webhooks ports.WebhookDispatcher
+	devices    ports.DeviceRepository
+	hb         ports.HeartbeatRepository
+	presence   ports.DevicePresence
+	pepper     string
+	signingKey []byte
+	sigMaxSkew time.Duration
+	offline    time.Duration
+	audit      ports.AuditRepository
+	webhooks   ports.WebhookDispatcher
 }
 
 func NewDeviceService(
@@ -130,14 +133,17 @@ func NewDeviceService(
 	hb ports.HeartbeatRepository,
 	presence ports.DevicePresence,
 	pepper string,
+	signingKey []byte,
+	sigMaxSkew time.Duration,
 	offlineSeconds int,
 	audit ports.AuditRepository,
 	webhooks ports.WebhookDispatcher,
 ) *DeviceService {
 	return &DeviceService{
 		devices: devices, hb: hb, presence: presence, pepper: pepper,
+		signingKey: signingKey, sigMaxSkew: sigMaxSkew,
 		offline: time.Duration(offlineSeconds) * time.Second,
-		audit: audit, webhooks: webhooks,
+		audit:   audit, webhooks: webhooks,
 	}
 }
 
@@ -164,11 +170,16 @@ func (s *DeviceService) Register(ctx context.Context, ownerID uuid.UUID, in Regi
 	if err != nil {
 		return nil, err
 	}
+	encKey, err := crypto.EncryptSecret(s.signingKey, rawKey)
+	if err != nil {
+		return nil, err
+	}
 	d := &domain.Device{
 		OwnerID:        ownerID,
 		DeviceUUID:     in.DeviceUUID,
 		Name:           in.Name,
 		APIKeyHash:     auth.HashAPIKey(rawKey, s.pepper),
+		APIKeyEnc:      encKey,
 		APIKeyPrefix:   prefix,
 		Status:         domain.DeviceOffline,
 		Manufacturer:   in.Manufacturer,
@@ -224,6 +235,7 @@ func (s *DeviceService) Heartbeat(ctx context.Context, device *domain.Device, hb
 		return err
 	}
 	_ = s.presence.SetOnline(ctx, device.ID, s.offline)
+	s.publishStatus(ctx, device.ID, domain.DeviceOnline, hb)
 	_ = s.webhooks.Dispatch(ctx, device.OwnerID, "device.heartbeat", fmt.Sprintf("hb:%s:%d", device.ID, hb.ID), map[string]any{
 		"device_id": device.ID,
 		"heartbeat": hb,
@@ -231,14 +243,55 @@ func (s *DeviceService) Heartbeat(ctx context.Context, device *domain.Device, hb
 	return nil
 }
 
+// VerifyRequestSignature enforces request signing + replay protection for agent
+// REST calls. The device signs "timestamp.body" with the raw API key it received
+// at registration (the same secret it already holds); the server decrypts its
+// stored copy of that key to recompute the signature. nonce is typically the
+// request's X-Request-ID and is rejected if seen again within the skew window.
+func (s *DeviceService) VerifyRequestSignature(ctx context.Context, device *domain.Device, timestampUnix int64, signature string, nonce string, body []byte) error {
+	if signature == "" || nonce == "" {
+		return fmt.Errorf("missing signature or nonce")
+	}
+	rawKey, err := crypto.DecryptSecret(s.signingKey, device.APIKeyEnc)
+	if err != nil {
+		return fmt.Errorf("could not verify signature")
+	}
+	if err := crypto.VerifyWebhook(rawKey, timestampUnix, body, signature, s.sigMaxSkew); err != nil {
+		return err
+	}
+	fresh, err := s.presence.CheckAndStoreNonce(ctx, device.ID.String()+":"+nonce, s.sigMaxSkew)
+	if err != nil {
+		return err
+	}
+	if !fresh {
+		return fmt.Errorf("replayed request")
+	}
+	return nil
+}
+
 func (s *DeviceService) MarkConnected(ctx context.Context, deviceID uuid.UUID) error {
 	now := time.Now().UTC()
 	_ = s.presence.SetOnline(ctx, deviceID, s.offline)
+	s.publishStatus(ctx, deviceID, domain.DeviceOnline, nil)
 	return s.devices.UpdateStatus(ctx, deviceID, domain.DeviceOnline, &now)
 }
 
 func (s *DeviceService) MarkDisconnected(ctx context.Context, deviceID uuid.UUID) error {
+	s.publishStatus(ctx, deviceID, domain.DeviceOffline, nil)
 	return s.devices.UpdateStatus(ctx, deviceID, domain.DeviceOffline, nil)
+}
+
+func (s *DeviceService) publishStatus(ctx context.Context, deviceID uuid.UUID, status domain.DeviceStatus, hb *domain.DeviceHeartbeat) {
+	payload, err := json.Marshal(map[string]any{
+		"device_id": deviceID,
+		"status":    status,
+		"heartbeat": hb,
+		"at":        time.Now().UTC(),
+	})
+	if err != nil {
+		return
+	}
+	_ = s.presence.Publish(ctx, statusChannel(deviceID), payload)
 }
 
 func (s *DeviceService) LatestHealth(ctx context.Context, ownerID, deviceID uuid.UUID) (*domain.DeviceHeartbeat, error) {
@@ -246,6 +299,48 @@ func (s *DeviceService) LatestHealth(ctx context.Context, ownerID, deviceID uuid
 		return nil, err
 	}
 	return s.hb.LatestByDevice(ctx, deviceID)
+}
+
+// HealthHistory returns recent heartbeat samples so the dashboard can render
+// time-series health metrics rather than only the latest sample.
+func (s *DeviceService) HealthHistory(ctx context.Context, ownerID, deviceID uuid.UUID, limit int) ([]domain.DeviceHeartbeat, error) {
+	if _, err := s.Get(ctx, ownerID, deviceID); err != nil {
+		return nil, err
+	}
+	return s.hb.ListByDevice(ctx, deviceID, limit)
+}
+
+// SubscribeStatus lets the dashboard receive live online/offline + heartbeat
+// push updates for a device without polling.
+func (s *DeviceService) SubscribeStatus(ctx context.Context, ownerID, deviceID uuid.UUID) (<-chan []byte, func(), error) {
+	if _, err := s.Get(ctx, ownerID, deviceID); err != nil {
+		return nil, nil, err
+	}
+	return s.presence.Subscribe(ctx, statusChannel(deviceID))
+}
+
+func statusChannel(deviceID uuid.UUID) string {
+	return "device:status:" + deviceID.String()
+}
+
+// ReportCrash records an uncaught-exception report from the agent (crash
+// reporting per PRD §12) into the audit trail and notifies via webhook.
+func (s *DeviceService) ReportCrash(ctx context.Context, device *domain.Device, message, stackTrace, appVersion string) error {
+	_ = s.audit.Insert(ctx, &domain.AuditLog{
+		ActorType: "device", ActorID: device.ID.String(), Action: "device.crash",
+		ResourceType: "device", ResourceID: device.ID.String(),
+		Metadata: mustJSON(map[string]any{
+			"message":     message,
+			"stack_trace": stackTrace,
+			"app_version": appVersion,
+		}),
+	})
+	return s.webhooks.Dispatch(ctx, device.OwnerID, "device.crash", device.ID.String()+":"+auth.HashToken(message+stackTrace), map[string]any{
+		"device_id":   device.ID,
+		"message":     message,
+		"stack_trace": stackTrace,
+		"app_version": appVersion,
+	})
 }
 
 func (s *DeviceService) SweepOffline(ctx context.Context) (int64, error) {

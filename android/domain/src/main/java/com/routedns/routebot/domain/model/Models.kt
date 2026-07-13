@@ -101,12 +101,26 @@ enum class SmsDirection {
 
 @Serializable
 data class SmsMessage(
+    val id: String? = null,
     val direction: SmsDirection,
     val address: String,
     val body: String,
     @SerialName("sim_slot") val simSlot: Int = 0,
     val status: String = "received",
     @SerialName("provider_ref") val providerRef: String? = null
+)
+
+@Serializable
+data class SmsStatusUpdateRequest(
+    val status: String,
+    @SerialName("delivered_at") val deliveredAt: String? = null
+)
+
+@Serializable
+data class CrashReport(
+    val message: String,
+    @SerialName("stack_trace") val stackTrace: String,
+    @SerialName("app_version") val appVersion: String
 )
 
 @Serializable
@@ -178,7 +192,8 @@ data class CommandAckRequest(
 enum class MediaType {
     @SerialName("audio") AUDIO,
     @SerialName("video") VIDEO,
-    @SerialName("screenshot") SCREENSHOT
+    @SerialName("screenshot") SCREENSHOT,
+    @SerialName("logs") LOGS
 }
 
 @Serializable
@@ -191,14 +206,26 @@ data class AgentConfig(
 )
 
 @Serializable
+data class SimSlotInfo(
+    val slotIndex: Int,
+    val subscriptionId: Int,
+    val carrierName: String = "",
+    val displayName: String = "",
+    val isEmbedded: Boolean = false
+)
+
+@Serializable
 data class DeviceHealthSnapshot(
     val batteryLevel: Int = -1,
     val isCharging: Boolean = false,
     val storageFreeMb: Long = 0,
     val ramFreeMb: Long = 0,
+    /** Best-effort: derived from /proc/stat deltas; null where the platform restricts access. */
+    val cpuUsage: Double? = null,
     val networkType: String = "unknown",
     val wifiSsid: String = "",
     val signalStrength: Int? = null,
+    val simInfo: List<SimSlotInfo> = emptyList(),
     val manufacturer: String = "",
     val model: String = "",
     val androidVersion: String = "",
@@ -226,6 +253,7 @@ object CommandTypes {
     const val RECORD_AUDIO = "record_audio"
     const val RECORD_VIDEO = "record_video"
     const val TAKE_SCREENSHOT = "take_screenshot"
+    const val UPLOAD_LOGS = "upload_logs"
 }
 
 object EventTypes {

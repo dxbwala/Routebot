@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -33,6 +34,10 @@ func JWT(tokens *auth.Manager) fiber.Handler {
 	}
 }
 
+// DeviceAPIKey authenticates the device via its API key hash, then requires a
+// valid HMAC request signature (X-Timestamp + X-Signature, keyed on the raw
+// API key) with replay protection via X-Request-ID. This covers both
+// "request signing" and "replay protection" for agent traffic.
 func DeviceAPIKey(devices *service.DeviceService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		key := c.Get("X-Device-API-Key")
@@ -43,6 +48,18 @@ func DeviceAPIKey(devices *service.DeviceService) fiber.Handler {
 		if err != nil {
 			return response.Fail(c, fiber.StatusUnauthorized, "unauthorized", "invalid device api key")
 		}
+
+		tsHeader := c.Get("X-Timestamp")
+		signature := c.Get("X-Signature")
+		nonce := c.Get("X-Request-ID")
+		ts, err := strconv.ParseInt(tsHeader, 10, 64)
+		if err != nil {
+			return response.Fail(c, fiber.StatusUnauthorized, "unauthorized", "missing or invalid X-Timestamp")
+		}
+		if err := devices.VerifyRequestSignature(c.Context(), d, ts, signature, nonce, c.Body()); err != nil {
+			return response.Fail(c, fiber.StatusUnauthorized, "unauthorized", "invalid or replayed request signature")
+		}
+
 		c.Locals(CtxDevice, d)
 		return c.Next()
 	}

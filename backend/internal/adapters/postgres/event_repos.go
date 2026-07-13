@@ -46,9 +46,15 @@ func (r *SMSRepo) ListByDevice(ctx context.Context, deviceID uuid.UUID, limit in
 	return out, rows.Err()
 }
 
-func (r *SMSRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status string, deliveredAt *time.Time) error {
-	_, err := r.pool.Exec(ctx, `UPDATE sms_messages SET status = $2, delivered_at = $3 WHERE id = $1`, id, status, deliveredAt)
-	return err
+func (r *SMSRepo) UpdateStatus(ctx context.Context, id uuid.UUID, deviceID uuid.UUID, status string, deliveredAt *time.Time) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE sms_messages SET status = $3, delivered_at = COALESCE($4, delivered_at)
+		WHERE id = $1 AND device_id = $2
+	`, id, deviceID, status, deliveredAt)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 type OTPRepo struct{ pool *pgxpool.Pool }

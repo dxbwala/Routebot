@@ -45,6 +45,10 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // Encrypts the on-device Room database at rest (PRD §11 "Local database encryption").
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

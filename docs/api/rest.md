@@ -8,7 +8,7 @@ Envelope:
 { "success": false, "error": { "code": "bad_request", "message": "..." } }
 ```
 
-## Auth (public)
+## Auth (public, rate-limited)
 
 | Method | Path | Body |
 |--------|------|------|
@@ -28,6 +28,8 @@ Dashboard requests: `Authorization: Bearer <access_token>`.
 | GET | `/devices` | List devices |
 | GET | `/devices/:id` | Device detail |
 | GET | `/devices/:id/health` | Latest heartbeat |
+| GET | `/devices/:id/health/history` | Heartbeat history (up to 200 samples) |
+| GET | `/devices/:id/live` | Server-Sent Events stream of live status/heartbeat pushes |
 | GET | `/devices/:id/sms` | SMS history |
 | GET | `/devices/:id/otp` | OTP history |
 | GET | `/devices/:id/notifications` | Notification history |
@@ -57,19 +59,34 @@ Dashboard requests: `Authorization: Bearer <access_token>`.
 
 `ping`, `sync`, `restart_services`, `refresh_config`, `clear_cache`, `upload_logs`, `update_config`, `record_audio`, `record_video`, `take_screenshot`, `send_sms`, `ussd`
 
-## Agent (device API key)
+## Agent (device API key + request signing)
 
-Header: `X-Device-API-Key: rb_...`
+Every agent request must carry:
+
+| Header | Description |
+|--------|-------------|
+| `X-Device-API-Key` | `rb_...` issued at registration/enrollment |
+| `X-Timestamp` | Unix seconds, must be within `REQUEST_SIGNATURE_MAX_SKEW` (default 5m) of server time |
+| `X-Signature` | `hex(HMAC-SHA256(secret = raw_api_key, message = "<timestamp>." + body))` |
+| `X-Request-ID` | Unique per request; reused values are rejected as replays within the skew window |
+
+The server verifies the signature by decrypting its own stored copy of the device's API key
+(kept separately from the one-way hash used to authenticate `X-Device-API-Key`), so both sides
+can independently compute the same HMAC. This provides both **request signing** and **replay
+protection** (PRD §11) without any extra round trip. Requests missing or failing these checks
+receive `401 unauthorized`.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/agent/heartbeat` | Telemetry sample |
-| POST | `/agent/sms` | Ingest SMS |
+| POST | `/agent/crash` | Crash report `{ message, stack_trace, app_version }` |
+| POST | `/agent/sms` | Ingest SMS; response includes the created row's `id` |
+| POST | `/agent/sms/:id/status` | Delivery report `{ status: sent\|failed\|delivered\|delivery_failed, delivered_at? }` |
 | POST | `/agent/otp` | Ingest OTP |
 | POST | `/agent/notifications` | Ingest notification |
 | POST | `/agent/calls` | Ingest call event |
 | POST | `/agent/commands/:id/ack` | Ack/complete command |
-| POST | `/agent/media` | Multipart upload (`media_type`, `file`, optional `command_id`) |
+| POST | `/agent/media` | Multipart upload (`media_type`: `audio`\|`video`\|`screenshot`\|`logs`, `file`, optional `command_id`) |
 
 ### Heartbeat body (partial)
 
@@ -83,10 +100,13 @@ Header: `X-Device-API-Key: rb_...`
   "network_type": "wifi",
   "wifi_ssid": "Office",
   "signal_strength": -60,
-  "sim_info": [],
-  "payload": {}
+  "sim_info": [{"slotIndex": 0, "subscriptionId": 1, "carrierName": "Carrier", "displayName": "SIM 1"}],
+  "payload": {"manufacturer": "Google", "model": "Pixel 8"}
 }
 ```
+
+`cpu_usage` is best-effort (derived from `/proc/stat` deltas) and may be `null` on devices/OS
+versions that restrict access. `sim_info` omits phone numbers by design.
 
 ## Health
 

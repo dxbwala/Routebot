@@ -77,8 +77,8 @@ func NewRouter(d Deps) *fiber.App {
 	// Defense in depth alongside nginx's rate limiting: throttle auth/enrollment
 	// endpoints per client IP in case the app is ever reached directly.
 	authLimiter := limiter.New(limiter.Config{
-		Max:        10,
-		Expiration: 1 * time.Minute,
+		Max:               10,
+		Expiration:        1 * time.Minute,
 		LimiterMiddleware: limiter.SlidingWindow{},
 	})
 
@@ -93,7 +93,9 @@ func NewRouter(d Deps) *fiber.App {
 
 	agent := v1.Group("/agent")
 	agent.Post("/heartbeat", deviceKey, deviceH.Heartbeat)
+	agent.Post("/crash", deviceKey, deviceH.ReportCrash)
 	agent.Post("/sms", deviceKey, eventH.IngestSMS)
+	agent.Post("/sms/:id/status", deviceKey, eventH.UpdateSMSStatus)
 	agent.Post("/otp", deviceKey, eventH.IngestOTP)
 	agent.Post("/notifications", deviceKey, eventH.IngestNotification)
 	agent.Post("/calls", deviceKey, eventH.IngestCall)
@@ -104,6 +106,8 @@ func NewRouter(d Deps) *fiber.App {
 	v1.Get("/devices", jwt, deviceH.List)
 	v1.Get("/devices/:id", jwt, deviceH.Get)
 	v1.Get("/devices/:id/health", jwt, deviceH.Health)
+	v1.Get("/devices/:id/health/history", jwt, deviceH.HealthHistory)
+	v1.Get("/devices/:id/live", jwt, deviceH.LiveStatus)
 	v1.Get("/devices/:id/sms", jwt, eventH.ListSMS)
 	v1.Get("/devices/:id/otp", jwt, eventH.ListOTP)
 	v1.Get("/devices/:id/notifications", jwt, eventH.ListNotifications)

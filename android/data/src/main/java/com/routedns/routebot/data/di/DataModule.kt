@@ -10,6 +10,7 @@ import com.routedns.routebot.data.repository.ConfigRepositoryImpl
 import com.routedns.routebot.data.repository.DeviceRepositoryImpl
 import com.routedns.routebot.data.repository.JsonProvider
 import com.routedns.routebot.data.repository.OfflineQueueRepositoryImpl
+import com.routedns.routebot.data.security.DbPassphraseProvider
 import com.routedns.routebot.data.security.SecureStorageRepositoryImpl
 import com.routedns.routebot.domain.repository.AgentApiRepository
 import com.routedns.routebot.domain.repository.AuthRepository
@@ -41,10 +42,16 @@ abstract class DataBindModule {
 @InstallIn(SingletonComponent::class)
 object DataProvideModule {
     @Provides @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): RouteBotDatabase =
-        Room.databaseBuilder(context, RouteBotDatabase::class.java, "routebot.db")
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+        passphraseProvider: DbPassphraseProvider
+    ): RouteBotDatabase {
+        val factory = net.zetetic.database.sqlcipher.SupportOpenHelperFactory(passphraseProvider.getOrCreate())
+        return Room.databaseBuilder(context, RouteBotDatabase::class.java, "routebot.db")
+            .openHelperFactory(factory)
             .fallbackToDestructiveMigration()
             .build()
+    }
 
     @Provides fun provideQueuedEventDao(db: RouteBotDatabase): QueuedEventDao = db.queuedEventDao()
 

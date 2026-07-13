@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
@@ -11,9 +12,13 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
+import androidx.core.content.ContextCompat
 import com.routedns.routebot.domain.model.DeviceHealthSnapshot
+import com.routedns.routebot.domain.model.SimSlotInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.RandomAccessFile
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,14 +34,82 @@ class DeviceMonitor @Inject constructor(
             isCharging = battery.second,
             storageFreeMb = readStorageFreeMb(),
             ramFreeMb = readRamFreeMb(),
+            cpuUsage = readCpuUsagePercent(),
             networkType = network.first,
             wifiSsid = network.second,
             signalStrength = readSignalStrength(),
+            simInfo = readSimInfo(),
             manufacturer = Build.MANUFACTURER.orEmpty(),
             model = Build.MODEL.orEmpty(),
             androidVersion = Build.VERSION.RELEASE.orEmpty(),
             appVersion = appVersion
         )
+    }
+
+    /**
+     * Best-effort overall CPU usage percentage derived from two `/proc/stat` samples.
+     * Access to `/proc/stat` for system-wide CPU stats is not guaranteed on all Android
+     * versions/OEMs (SELinux policy varies); returns null when unavailable rather than
+     * a misleading value. No root or hidden APIs are used.
+     */
+    private fun readCpuUsagePercent(): Double? {
+        return try {
+            val first = readProcStatSample() ?: return null
+            Thread.sleep(200)
+            val second = readProcStatSample() ?: return null
+            val idleDelta = (second.idle - first.idle).toDouble()
+            val totalDelta = (second.total - first.total).toDouble()
+            if (totalDelta <= 0) return null
+            (1.0 - (idleDelta / totalDelta)) * 100.0
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private data class ProcStatSample(val idle: Long, val total: Long)
+
+    private fun readProcStatSample(): ProcStatSample? {
+        return try {
+            RandomAccessFile("/proc/stat", "r").use { file ->
+                val line = file.readLine() ?: return null
+                val parts = line.trim().split(Regex("\\s+")).drop(1).mapNotNull { it.toLongOrNull() }
+                if (parts.size < 4) return null
+                val idle = parts[3]
+                val total = parts.sum()
+                ProcStatSample(idle, total)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Active SIM slots (carrier/display name only — no phone numbers are collected).
+     * Requires READ_PHONE_STATE; returns an empty list where the permission or API is
+     * unavailable rather than failing the whole heartbeat.
+     */
+    private fun readSimInfo(): List<SimSlotInfo> {
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_PHONE_STATE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return emptyList()
+        }
+        return try {
+            val sm = context.getSystemService(SubscriptionManager::class.java) ?: return emptyList()
+            sm.activeSubscriptionInfoList.orEmpty().mapIndexed { index, info ->
+                SimSlotInfo(
+                    slotIndex = info.simSlotIndex.takeIf { it >= 0 } ?: index,
+                    subscriptionId = info.subscriptionId,
+                    carrierName = info.carrierName?.toString().orEmpty(),
+                    displayName = info.displayName?.toString().orEmpty(),
+                    isEmbedded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.isEmbedded else false
+                )
+            }
+        } catch (_: SecurityException) {
+            emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     fun toHeartbeatFields(snapshot: DeviceHealthSnapshot) = snapshot

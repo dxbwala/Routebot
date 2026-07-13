@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/routedns/routebot/backend/internal/domain"
 	"github.com/routedns/routebot/backend/internal/pkg/auth"
+	"github.com/routedns/routebot/backend/internal/pkg/crypto"
 	"github.com/routedns/routebot/backend/internal/service"
 	"github.com/stretchr/testify/require"
 )
@@ -174,20 +175,44 @@ func (m *memHB) ListByDevice(context.Context, uuid.UUID, int) ([]domain.DeviceHe
 type nopPresence struct{}
 
 func (nopPresence) SetOnline(context.Context, uuid.UUID, time.Duration) error { return nil }
-func (nopPresence) IsOnline(context.Context, uuid.UUID) (bool, error)        { return true, nil }
-func (nopPresence) Publish(context.Context, string, []byte) error            { return nil }
+func (nopPresence) IsOnline(context.Context, uuid.UUID) (bool, error)         { return true, nil }
+func (nopPresence) Publish(context.Context, string, []byte) error             { return nil }
 func (nopPresence) Subscribe(context.Context, string) (<-chan []byte, func(), error) {
 	ch := make(chan []byte)
 	return ch, func() {}, nil
+}
+
+type fakeNoncePresence struct {
+	nopPresence
+	seen map[string]bool
+}
+
+func (p *fakeNoncePresence) CheckAndStoreNonce(_ context.Context, key string, _ time.Duration) (bool, error) {
+	if p.seen == nil {
+		p.seen = map[string]bool{}
+	}
+	if p.seen[key] {
+		return false, nil
+	}
+	p.seen[key] = true
+	return true, nil
+}
+
+func (nopPresence) CheckAndStoreNonce(context.Context, string, time.Duration) (bool, error) {
+	return true, nil
 }
 
 type nopHooks struct{}
 
 func (nopHooks) Dispatch(context.Context, uuid.UUID, string, string, any) error { return nil }
 
+func testSigningKey() []byte {
+	return []byte("01234567890123456789012345678901")[:32]
+}
+
 func TestDeviceRegisterAndAuth(t *testing.T) {
 	devices := newMemDevices()
-	svc := service.NewDeviceService(devices, &memHB{}, nopPresence{}, "pepper", 90, nopAudit{}, nopHooks{})
+	svc := service.NewDeviceService(devices, &memHB{}, &fakeNoncePresence{}, "pepper", testSigningKey(), 5*time.Minute, 90, nopAudit{}, nopHooks{})
 	owner := uuid.New()
 	res, err := svc.Register(context.Background(), owner, service.RegisterDeviceInput{
 		DeviceUUID: "dev-1", Name: "Phone",
@@ -204,4 +229,33 @@ func TestDeviceRegisterAndAuth(t *testing.T) {
 	require.NoError(t, svc.Heartbeat(context.Background(), d, &domain.DeviceHeartbeat{
 		BatteryLevel: &level, IsCharging: &charging,
 	}))
+}
+
+func TestDeviceRequestSignatureAndReplayProtection(t *testing.T) {
+	devices := newMemDevices()
+	presence := &fakeNoncePresence{}
+	svc := service.NewDeviceService(devices, &memHB{}, presence, "pepper", testSigningKey(), 5*time.Minute, 90, nopAudit{}, nopHooks{})
+	owner := uuid.New()
+	res, err := svc.Register(context.Background(), owner, service.RegisterDeviceInput{
+		DeviceUUID: "dev-2", Name: "Phone",
+	}, "127.0.0.1")
+	require.NoError(t, err)
+
+	body := []byte(`{"battery_level":80}`)
+	now := time.Now().UTC()
+	sig := crypto.SignWebhook(res.APIKey, now, body)
+
+	// Valid signature + fresh nonce succeeds.
+	require.NoError(t, svc.VerifyRequestSignature(context.Background(), res.Device, now.Unix(), sig, "req-1", body))
+
+	// Replaying the same nonce is rejected even though the signature is still valid.
+	require.Error(t, svc.VerifyRequestSignature(context.Background(), res.Device, now.Unix(), sig, "req-1", body))
+
+	// Wrong signature (e.g. tampered body) is rejected.
+	require.Error(t, svc.VerifyRequestSignature(context.Background(), res.Device, now.Unix(), sig, "req-2", []byte(`{"battery_level":1}`)))
+
+	// Stale timestamp outside the skew window is rejected.
+	stale := now.Add(-1 * time.Hour)
+	staleSig := crypto.SignWebhook(res.APIKey, stale, body)
+	require.Error(t, svc.VerifyRequestSignature(context.Background(), res.Device, stale.Unix(), staleSig, "req-3", body))
 }

@@ -44,6 +44,22 @@ func (s *EventService) IngestSMS(ctx context.Context, device *domain.Device, msg
 	return s.webhooks.Dispatch(ctx, device.OwnerID, "sms."+string(msg.Direction), msg.ID.String(), msg)
 }
 
+// UpdateSMSStatus records a delivery report (from SmsManager's sent/delivered
+// PendingIntent callbacks on the device) against a previously-ingested SMS row.
+func (s *EventService) UpdateSMSStatus(ctx context.Context, device *domain.Device, smsID uuid.UUID, status string, deliveredAt *time.Time) error {
+	found, err := s.sms.UpdateStatus(ctx, smsID, device.ID, status, deliveredAt)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrNotFound
+	}
+	return s.webhooks.Dispatch(ctx, device.OwnerID, "sms.status_updated", smsID.String()+":"+status, map[string]any{
+		"sms_id": smsID,
+		"status": status,
+	})
+}
+
 func (s *EventService) ListSMS(ctx context.Context, ownerID, deviceID uuid.UUID, limit int) ([]domain.SMSMessage, error) {
 	if err := s.ensureOwner(ctx, ownerID, deviceID); err != nil {
 		return nil, err

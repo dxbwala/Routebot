@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bufio"
 	"errors"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -101,6 +103,68 @@ func (h *DeviceHandler) Health(c fiber.Ctx) error {
 	return response.OK(c, fiber.Map{"health": hb})
 }
 
+func (h *DeviceHandler) HealthHistory(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid id")
+	}
+	items, err := h.svc.HealthHistory(c.Context(), middleware.UserID(c), id, 200)
+	if err != nil {
+		return mapErr(c, err)
+	}
+	return response.OK(c, fiber.Map{"health": items})
+}
+
+// LiveStatus streams online/offline + heartbeat push updates via Server-Sent
+// Events, so the dashboard doesn't need to poll for "live status".
+func (h *DeviceHandler) LiveStatus(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid id")
+	}
+	ch, cancel, err := h.svc.SubscribeStatus(c.Context(), middleware.UserID(c), id)
+	if err != nil {
+		return mapErr(c, err)
+	}
+
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+
+	return c.SendStreamWriter(func(w *bufio.Writer) {
+		defer cancel()
+		for msg := range ch {
+			if _, err := w.WriteString("data: "); err != nil {
+				return
+			}
+			if _, err := w.Write(msg); err != nil {
+				return
+			}
+			if _, err := w.WriteString("\n\n"); err != nil {
+				return
+			}
+			if err := w.Flush(); err != nil {
+				return
+			}
+		}
+	})
+}
+
+func (h *DeviceHandler) ReportCrash(c fiber.Ctx) error {
+	var body struct {
+		Message    string `json:"message"`
+		StackTrace string `json:"stack_trace"`
+		AppVersion string `json:"app_version"`
+	}
+	if err := c.Bind().Body(&body); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid body")
+	}
+	if err := h.svc.ReportCrash(c.Context(), middleware.Device(c), body.Message, body.StackTrace, body.AppVersion); err != nil {
+		return mapErr(c, err)
+	}
+	return response.Created(c, fiber.Map{"reported": true})
+}
+
 func (h *DeviceHandler) Heartbeat(c fiber.Ctx) error {
 	var hb domain.DeviceHeartbeat
 	if err := c.Bind().Body(&hb); err != nil {
@@ -125,6 +189,39 @@ func (h *EventHandler) IngestSMS(c fiber.Ctx) error {
 		return mapErr(c, err)
 	}
 	return response.Created(c, fiber.Map{"sms": msg})
+}
+
+var validSMSStatuses = map[string]struct{}{
+	"sent": {}, "failed": {}, "delivered": {}, "delivery_failed": {},
+}
+
+func (h *EventHandler) UpdateSMSStatus(c fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid id")
+	}
+	var body struct {
+		Status      string `json:"status"`
+		DeliveredAt string `json:"delivered_at"`
+	}
+	if err := c.Bind().Body(&body); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid body")
+	}
+	if _, ok := validSMSStatuses[body.Status]; !ok {
+		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid status")
+	}
+	var deliveredAt *time.Time
+	if body.DeliveredAt != "" {
+		t, err := time.Parse(time.RFC3339, body.DeliveredAt)
+		if err != nil {
+			return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid delivered_at")
+		}
+		deliveredAt = &t
+	}
+	if err := h.svc.UpdateSMSStatus(c.Context(), middleware.Device(c), id, body.Status, deliveredAt); err != nil {
+		return mapErr(c, err)
+	}
+	return response.OK(c, fiber.Map{"updated": true})
 }
 
 func (h *EventHandler) ListSMS(c fiber.Ctx) error {

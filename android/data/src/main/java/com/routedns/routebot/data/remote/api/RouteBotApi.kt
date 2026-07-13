@@ -47,6 +47,19 @@ interface RouteBotApi {
         @Body body: SmsMessage
     ): ApiResponse<Map<String, SmsMessage>>
 
+    @POST("api/v1/agent/sms/{id}/status")
+    suspend fun updateSmsStatus(
+        @Header("X-Device-API-Key") apiKey: String,
+        @Path("id") smsId: String,
+        @Body body: com.routedns.routebot.domain.model.SmsStatusUpdateRequest
+    ): ApiResponse<Map<String, Boolean>>
+
+    @POST("api/v1/agent/crash")
+    suspend fun reportCrash(
+        @Header("X-Device-API-Key") apiKey: String,
+        @Body body: com.routedns.routebot.domain.model.CrashReport
+    ): ApiResponse<Map<String, Boolean>>
+
     @POST("api/v1/agent/otp")
     suspend fun ingestOtp(
         @Header("X-Device-API-Key") apiKey: String,

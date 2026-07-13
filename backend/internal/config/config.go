@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -19,6 +20,8 @@ type Config struct {
 	JWTRefreshTTL            time.Duration
 	DeviceAPIKeyPepper       string
 	WebhookHMACSecret        string
+	RequestSigningKey        []byte
+	RequestSignatureMaxSkew  time.Duration
 	MediaStoragePath         string
 	CORSOrigins              string
 	PostgresDSN              string
@@ -80,6 +83,22 @@ func Load() (*Config, error) {
 	if cfg.WebhookHMACSecret == "" {
 		return nil, fmt.Errorf("WEBHOOK_HMAC_SECRET is required")
 	}
+
+	signingKeyHex := getEnv("REQUEST_SIGNING_KEY", "")
+	if signingKeyHex == "" {
+		return nil, fmt.Errorf("REQUEST_SIGNING_KEY is required (64 hex chars / 32 bytes)")
+	}
+	signingKey, err := hex.DecodeString(signingKeyHex)
+	if err != nil || len(signingKey) != 32 {
+		return nil, fmt.Errorf("REQUEST_SIGNING_KEY must be 64 hex characters (32 bytes)")
+	}
+	cfg.RequestSigningKey = signingKey
+
+	skew, err := time.ParseDuration(getEnv("REQUEST_SIGNATURE_MAX_SKEW", "5m"))
+	if err != nil {
+		return nil, fmt.Errorf("REQUEST_SIGNATURE_MAX_SKEW: %w", err)
+	}
+	cfg.RequestSignatureMaxSkew = skew
 
 	return cfg, nil
 }

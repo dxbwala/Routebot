@@ -20,11 +20,11 @@ func (r *DeviceRepo) Create(ctx context.Context, d *domain.Device) error {
 	}
 	return r.pool.QueryRow(ctx, `
 		INSERT INTO devices (
-			owner_id, device_uuid, name, api_key_hash, api_key_prefix, status,
+			owner_id, device_uuid, name, api_key_hash, api_key_enc, api_key_prefix, status,
 			manufacturer, model, android_version, app_version, metadata
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING id, created_at, updated_at
-	`, d.OwnerID, d.DeviceUUID, d.Name, d.APIKeyHash, d.APIKeyPrefix, d.Status,
+	`, d.OwnerID, d.DeviceUUID, d.Name, d.APIKeyHash, d.APIKeyEnc, d.APIKeyPrefix, d.Status,
 		d.Manufacturer, d.Model, d.AndroidVersion, d.AppVersion, d.Metadata,
 	).Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt)
 }
@@ -34,7 +34,7 @@ func scanDevice(row interface {
 }) (*domain.Device, error) {
 	d := &domain.Device{}
 	err := row.Scan(
-		&d.ID, &d.OwnerID, &d.DeviceUUID, &d.Name, &d.APIKeyHash, &d.APIKeyPrefix,
+		&d.ID, &d.OwnerID, &d.DeviceUUID, &d.Name, &d.APIKeyHash, &d.APIKeyEnc, &d.APIKeyPrefix,
 		&d.Status, &d.Manufacturer, &d.Model, &d.AndroidVersion, &d.AppVersion,
 		&d.LastSeenAt, &d.Metadata, &d.CreatedAt, &d.UpdatedAt,
 	)
@@ -42,7 +42,7 @@ func scanDevice(row interface {
 }
 
 const deviceCols = `
-	id, owner_id, device_uuid, name, api_key_hash, api_key_prefix, status,
+	id, owner_id, device_uuid, name, api_key_hash, api_key_enc, api_key_prefix, status,
 	manufacturer, model, android_version, app_version, last_seen_at, metadata, created_at, updated_at
 `
 

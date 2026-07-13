@@ -55,6 +55,18 @@ func (p *Presence) Subscribe(ctx context.Context, channel string) (<-chan []byte
 	return ch, cancel, nil
 }
 
+func (p *Presence) CheckAndStoreNonce(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	ok, err := p.client.SetNX(ctx, nonceKey(key), "1", ttl).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
 func presenceKey(deviceID uuid.UUID) string {
 	return fmt.Sprintf("device:online:%s", deviceID.String())
+}
+
+func nonceKey(key string) string {
+	return fmt.Sprintf("request:nonce:%s", key)
 }
