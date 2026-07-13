@@ -354,9 +354,11 @@ class ConfigRepositoryImpl @Inject constructor(
     override fun observeConfig(): Flow<AgentConfig> = configFlow
 
     override suspend fun getConfig(): AgentConfig = withContext(Dispatchers.IO) {
+        val autoName = com.routedns.routebot.common.DeviceNames.auto()
+        secureStorage.saveDeviceName(autoName)
         AgentConfig(
             serverUrl = secureStorage.getServerUrl().orEmpty(),
-            deviceName = secureStorage.getDeviceName().orEmpty(),
+            deviceName = autoName,
             otpPatterns = secureStorage.getOtpPatterns(),
             notificationPackages = secureStorage.getNotificationPackages(),
             certificatePins = secureStorage.getCertificatePins()
@@ -364,12 +366,13 @@ class ConfigRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateConfig(config: AgentConfig) = withContext(Dispatchers.IO) {
+        val autoName = com.routedns.routebot.common.DeviceNames.auto()
         secureStorage.saveServerUrl(config.serverUrl)
-        secureStorage.saveDeviceName(config.deviceName)
+        secureStorage.saveDeviceName(autoName)
         secureStorage.saveOtpPatterns(config.otpPatterns)
         secureStorage.saveNotificationPackages(config.notificationPackages)
         secureStorage.saveCertificatePins(config.certificatePins)
-        configFlow.value = config
+        configFlow.value = config.copy(deviceName = autoName)
     }
 }
 

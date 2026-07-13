@@ -193,7 +193,9 @@ class SetupViewModel @Inject constructor(
         }
         return DeviceRegistrationRequest(
             deviceUuid = uuid,
-            name = secureStorage.getDeviceName() ?: "${Build.MANUFACTURER} ${Build.MODEL}",
+            name = com.routedns.routebot.common.DeviceNames.auto().also {
+                secureStorage.saveDeviceName(it)
+            },
             manufacturer = Build.MANUFACTURER,
             model = Build.MODEL,
             androidVersion = Build.VERSION.RELEASE,

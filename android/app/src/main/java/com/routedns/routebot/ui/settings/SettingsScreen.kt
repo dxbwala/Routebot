@@ -60,12 +60,12 @@ class SettingsViewModel @Inject constructor(
 
     fun save(
         serverUrl: String,
-        deviceName: String,
         otpPatterns: String,
         notificationPackages: String,
         certificatePins: String
     ) {
         viewModelScope.launch {
+            val deviceName = com.routedns.routebot.common.DeviceNames.auto()
             val updated = AgentConfig(
                 serverUrl = serverUrl.trimEnd('/'),
                 deviceName = deviceName,
@@ -97,7 +97,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val saved by viewModel.saved.collectAsState()
 
     var serverUrl by remember(config.serverUrl) { mutableStateOf(config.serverUrl) }
-    var deviceName by remember(config.deviceName) { mutableStateOf(config.deviceName) }
     var otpPatterns by remember(config.otpPatterns) { mutableStateOf(config.otpPatterns.joinToString("\n")) }
     var notificationPackages by remember(config.notificationPackages) {
         mutableStateOf(config.notificationPackages.joinToString(","))
@@ -127,7 +126,15 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(serverUrl, { serverUrl = it }, label = { Text("Server URL") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(deviceName, { deviceName = it }, label = { Text("Device Name") }, modifier = Modifier.fillMaxWidth())
+            Text(
+                "Device name: ${com.routedns.routebot.common.DeviceNames.auto()}",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                "Set automatically from manufacturer and model",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             OutlinedTextField(
                 otpPatterns, { otpPatterns = it },
                 label = { Text("OTP Regex Patterns (one per line)") },
@@ -147,7 +154,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             )
             Button(
                 onClick = {
-                    viewModel.save(serverUrl, deviceName, otpPatterns, notificationPackages, certificatePins)
+                    viewModel.save(serverUrl, otpPatterns, notificationPackages, certificatePins)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Save & Restart Agent") }
