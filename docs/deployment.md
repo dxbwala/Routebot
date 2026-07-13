@@ -158,10 +158,18 @@ git tag android-v1.0.0
 git push origin android-v1.0.0
 ```
 
-This builds a signed APK + AAB (versionCode = the CI run number, versionName = the tag's
-version), verifies the APK signature with `apksigner`, and publishes both files to a new GitHub
-Release. You can also trigger it manually from the Actions tab with a version input
-(`workflow_dispatch`) without pushing a tag first.
+CI builds **two signed phone APKs** (same codebase, `targetSdk` 35) plus a modern AAB:
+
+| Artifact | Devices |
+|----------|---------|
+| `RouteBot-x.y.z-modern-arm64.apk` | Current 64-bit phones (`arm64-v8a`) — recommended |
+| `RouteBot-x.y.z-legacy-armv7.apk` | Older 32-bit ARM phones (`armeabi-v7a`) |
+| `RouteBot-x.y.z-modern.aab` | Play Console |
+
+Both flavors support Android 8.0+ (`minSdk` 26) through the latest platform (`compileSdk` /
+`targetSdk` 35). versionCodes are `base*10+1` (legacy) and `base*10+2` (modern) so updates
+do not collide. You can also trigger the workflow manually from the Actions tab with a version
+input (`workflow_dispatch`) without pushing a tag first.
 
 ## Production checklist
 

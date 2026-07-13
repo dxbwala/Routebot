@@ -1,7 +1,7 @@
 name: Android Release
 
-# Builds a signed release APK + AAB using the production keystore (from repo
-# secrets) and publishes them to a GitHub Release.
+# Builds signed release APKs for legacy (32-bit) and modern (64-bit) devices plus
+# a Play-style AAB, then publishes them to a GitHub Release.
 #
 # Trigger either by:
 #   - Pushing a tag like `android-v1.2.3`, or
@@ -67,7 +67,7 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Releasing version $VERSION (tag $TAG, versionCode ${{ github.run_number }})"
+          echo "Releasing version $VERSION (tag $TAG, versionCode base ${{ github.run_number }})"
 
       - name: Decode release keystore
         env:
@@ -79,38 +79,66 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
 
-      - name: Build signed release APK + AAB
+      - name: Build signed legacy + modern release APKs and modern AAB
         env:
           ROUTEBOT_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
           ROUTEBOT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ROUTEBOT_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ROUTEBOT_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          ./gradlew :app:assembleRelease :app:bundleRelease \
+          ./gradlew \
+            :app:assembleLegacyRelease \
+            :app:assembleModernRelease \
+            :app:bundleModernRelease \
             -ProutebotVersionName="${{ steps.version.outputs.version }}" \
             -ProutebotVersionCode="${{ github.run_number }}" \
             --stacktrace
 
-      - name: Verify the build was actually signed
+      - name: Verify APK signatures
         run: |
           set -e
-          APK="app/build/outputs/apk/release/app-release.apk"
-          if command -v apksigner >/dev/null 2>&1; then
-            apksigner verify "$APK"
-          else
-            "$ANDROID_HOME/build-tools"/*/apksigner verify "$APK" 2>/dev/null || {
-              echo "apksigner not found; skipping explicit signature verification" >&2
-            }
+          shopt -s nullglob
+          APKS=(
+            app/build/outputs/apk/legacy/release/*.apk
+            app/build/outputs/apk/modern/release/*.apk
+          )
+          if [ ${#APKS[@]} -eq 0 ]; then
+            echo "No release APKs found" >&2
+            exit 1
           fi
+          for apk in "${APKS[@]}"; do
+            echo "Verifying $apk"
+            if command -v apksigner >/dev/null 2>&1; then
+              apksigner verify "$apk"
+            else
+              "$ANDROID_HOME/build-tools"/*/apksigner verify "$apk" 2>/dev/null || {
+                echo "apksigner not found; skipping explicit signature verification" >&2
+              }
+            fi
+          done
 
       - name: Collect release artifacts
         run: |
+          set -e
           mkdir -p release-artifacts
-          cp app/build/outputs/apk/release/app-release.apk \
-            "release-artifacts/RouteBot-${{ steps.version.outputs.version }}.apk"
-          cp app/build/outputs/bundle/release/app-release.aab \
-            "release-artifacts/RouteBot-${{ steps.version.outputs.version }}.aab"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          LEGACY_APK=$(ls app/build/outputs/apk/legacy/release/*.apk | head -n1)
+          MODERN_APK=$(ls app/build/outputs/apk/modern/release/*.apk | head -n1)
+          MODERN_AAB=$(ls app/build/outputs/bundle/modernRelease/*.aab | head -n1)
+
+          cp "$LEGACY_APK" "release-artifacts/RouteBot-${VERSION}-legacy-armv7.apk"
+          cp "$MODERN_APK" "release-artifacts/RouteBot-${VERSION}-modern-arm64.apk"
+          cp "$MODERN_AAB" "release-artifacts/RouteBot-${VERSION}-modern.aab"
+
           echo "## Release artifact sizes" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| File | Who should install |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|--------------------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| \`RouteBot-${VERSION}-legacy-armv7.apk\` | Older 32-bit ARM phones |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| \`RouteBot-${VERSION}-modern-arm64.apk\` | Current 64-bit phones (recommended) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| \`RouteBot-${VERSION}-modern.aab\` | Play Console upload |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           for f in release-artifacts/*; do
             size=$(du -h "$f" | cut -f1)
             bytes=$(wc -c < "$f" | tr -d ' ')
@@ -127,9 +155,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          cat > "$NOTES_FILE" <<EOF
+          ## Downloads
+          - **modern-arm64** — recommended for current phones (64-bit ARM, Android 8+)
+          - **legacy-armv7** — older 32-bit ARM phones (Android 8+)
+          - **modern.aab** — upload to Play Console
+
+          Both flavors target Android API 35 and share the same app features.
+          EOF
+          # Strip leading indentation from the heredoc body
+          sed -i 's/^          //' "$NOTES_FILE"
           gh release create "${{ steps.version.outputs.tag }}" \
-            release-artifacts/RouteBot-${{ steps.version.outputs.version }}.apk \
-            release-artifacts/RouteBot-${{ steps.version.outputs.version }}.aab \
-            --title "RouteBot Android v${{ steps.version.outputs.version }}" \
-            --generate-notes \
+            "release-artifacts/RouteBot-${VERSION}-legacy-armv7.apk" \
+            "release-artifacts/RouteBot-${VERSION}-modern-arm64.apk" \
+            "release-artifacts/RouteBot-${VERSION}-modern.aab" \
+            --title "RouteBot Android v${VERSION}" \
+            --notes-file "$NOTES_FILE" \
             --repo "${{ github.repository }}"
