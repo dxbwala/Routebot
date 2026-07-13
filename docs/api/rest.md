@@ -59,6 +59,30 @@ Dashboard requests: `Authorization: Bearer <access_token>`.
 
 `ping`, `sync`, `restart_services`, `refresh_config`, `clear_cache`, `upload_logs`, `update_config`, `send_sms`, `ussd`
 
+Dual-SIM tray numbering (`sim_slot` / heartbeat `slotIndex`): **`1` = SIM 1, `2` = SIM 2**.  
+See [sim-slots.md](../architecture/sim-slots.md).
+
+### `send_sms` payload
+
+```json
+{ "address": "+15551234567", "body": "hello", "sim_slot": 1 }
+```
+
+`sim_slot` is **1-based** physical tray: `1` = SIM 1, `2` = SIM 2 (default `1`).
+
+### `ussd` payload
+
+```json
+{ "code": "*123#", "sim_slot": 1, "steps": ["1"] }
+```
+
+`sim_slot` is **1-based** like SMS: `1` = SIM 1, `2` = SIM 2.  
+Omit `sim_slot` to use the device **Dial / default voice SIM**.
+
+Optional override: `subscription_id` (Android subscription id from heartbeat `sim_info`) wins if both are set.
+
+USSD platform limits: [ussd-limitations.md](../architecture/ussd-limitations.md).
+
 ## Agent (device API key + request signing)
 
 Every agent request must carry:
@@ -100,13 +124,29 @@ receive `401 unauthorized`.
   "network_type": "wifi",
   "wifi_ssid": "Office",
   "signal_strength": -60,
-  "sim_info": [{"slotIndex": 0, "subscriptionId": 1, "carrierName": "Carrier", "displayName": "SIM 1"}],
+  "sim_info": [{"slotIndex": 1, "subscriptionId": 6, "carrierName": "Carrier", "displayName": "SIM 1", "phoneNumber": "+15551234567"}],
   "payload": {"manufacturer": "Google", "model": "Pixel 8"}
 }
 ```
 
 `cpu_usage` is best-effort (derived from `/proc/stat` deltas) and may be `null` on devices/OS
-versions that restrict access. `sim_info` omits phone numbers by design.
+versions that restrict access. `sim_info.slotIndex` is **1-based** (`1` = SIM 1, `2` = SIM 2).
+`phoneNumber` is filled from telephony when available, otherwise via a rate-limited USSD `*2#`
+discovery — see [sim-slots.md](../architecture/sim-slots.md).
+
+### Agent SMS ingest body (partial)
+
+```json
+{
+  "direction": "inbound",
+  "address": "+15551234567",
+  "body": "OTP 123456",
+  "sim_slot": 1,
+  "status": "received"
+}
+```
+
+`sim_slot` on stored SMS rows is **1-based** (`1` / `2`).
 
 ## Health
 

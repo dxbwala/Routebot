@@ -105,7 +105,7 @@ data class SmsMessage(
     val direction: SmsDirection,
     val address: String,
     val body: String,
-    @SerialName("sim_slot") val simSlot: Int = 0,
+    @SerialName("sim_slot") val simSlot: Int = 1,
     val status: String = "received",
     @SerialName("provider_ref") val providerRef: String? = null
 )
@@ -204,11 +204,14 @@ data class AgentConfig(
 
 @Serializable
 data class SimSlotInfo(
+    /** 1-based tray: 1 = SIM 1, 2 = SIM 2 (matches command payload `sim_slot`). */
     val slotIndex: Int,
     val subscriptionId: Int,
     val carrierName: String = "",
     val displayName: String = "",
-    val isEmbedded: Boolean = false
+    val isEmbedded: Boolean = false,
+    /** MSISDN when known (telephony or USSD *2# discovery); empty if unknown. */
+    val phoneNumber: String = ""
 )
 
 @Serializable

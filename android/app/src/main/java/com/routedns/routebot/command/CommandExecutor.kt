@@ -93,7 +93,8 @@ class CommandExecutor @Inject constructor(
                 val payload = command.payload as? JsonObject ?: error("payload required")
                 val address = payload["address"]?.jsonPrimitive?.contentOrNull ?: error("address required")
                 val body = payload["body"]?.jsonPrimitive?.contentOrNull ?: error("body required")
-                val slot = payload["sim_slot"]?.jsonPrimitive?.intOrNull ?: 0
+                val slot = payload["sim_slot"]?.jsonPrimitive?.intOrNull
+                    ?: com.routedns.routebot.common.SimSlots.DEFAULT
                 smsHelper.sendSms(address, body, slot).getOrThrow()
                 null
             }
@@ -101,6 +102,7 @@ class CommandExecutor @Inject constructor(
                 val payload = command.payload as? JsonObject ?: error("payload required")
                 val code = payload["code"]?.jsonPrimitive?.contentOrNull ?: error("code required")
                 val subId = payload["subscription_id"]?.jsonPrimitive?.intOrNull
+                val simSlot = payload["sim_slot"]?.jsonPrimitive?.intOrNull
                 val steps = payload["steps"]?.let { el ->
                     when (el) {
                         is kotlinx.serialization.json.JsonArray -> el.mapNotNull {
@@ -120,10 +122,17 @@ class CommandExecutor @Inject constructor(
                         else -> emptyList()
                     }
                 } ?: emptyList()
-                val response = ussdHelper.sendUssd(code, subId, steps).getOrThrow()
+                val response = ussdHelper.sendUssd(
+                    code = code,
+                    subscriptionId = subId,
+                    steps = steps,
+                    simSlot = simSlot
+                ).getOrThrow()
                 JsonObject(
                     mapOf(
                         "code" to JsonPrimitive(code),
+                        "sim_slot" to JsonPrimitive(simSlot ?: 0),
+                        "subscription_id" to JsonPrimitive(subId ?: 0),
                         "steps" to kotlinx.serialization.json.JsonArray(
                             steps.map { JsonPrimitive(it) }
                         ),

@@ -60,6 +60,9 @@ sequenceDiagram
 
 ## SMS delivery report
 
+Outbound SMS may select a tray with `sim_slot` **1** (SIM 1) or **2** (SIM 2) —
+see [sim-slots.md](sim-slots.md).
+
 ```mermaid
 sequenceDiagram
   participant Agent as Android_Agent

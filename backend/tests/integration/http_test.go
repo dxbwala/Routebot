@@ -234,7 +234,7 @@ func TestFullDeviceLifecycle(t *testing.T) {
 
 	// 8. Signed SMS ingest, then delivery-status update round trip.
 	smsBody, _ := json.Marshal(map[string]any{
-		"direction": "inbound", "address": "+15551234", "body": "code 123456", "sim_slot": 0,
+		"direction": "inbound", "address": "+15551234", "body": "code 123456", "sim_slot": 1,
 	})
 	resp, out = signedAgentRequest(t, app, http.MethodPost, "/api/v1/agent/sms", apiKey, smsBody)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, out)

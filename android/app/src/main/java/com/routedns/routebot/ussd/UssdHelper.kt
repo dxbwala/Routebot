@@ -15,6 +15,7 @@ import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import com.routedns.routebot.common.RouteBotLog
+import com.routedns.routebot.common.SimSlots
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -30,6 +31,9 @@ import kotlin.coroutines.resume
  *
  * Path 1: [TelephonyManager.sendUssdRequest] (API 26+) — single-shot only.
  * Path 2: Dial + Accessibility scrape/type — required for Oppo/ColorOS and multi-step menus.
+ *
+ * SIM selection: prefer explicit [subscriptionId]; otherwise resolve `sim_slot` 1|2 to that
+ * tray's subscription. If both are omitted, the device Dial/default voice SIM is used.
  */
 @Singleton
 class UssdHelper @Inject constructor(
@@ -39,7 +43,8 @@ class UssdHelper @Inject constructor(
     suspend fun sendUssd(
         code: String,
         subscriptionId: Int? = null,
-        steps: List<String> = emptyList()
+        steps: List<String> = emptyList(),
+        simSlot: Int? = null
     ): Result<String> {
         val normalized = normalizeCode(code)
             ?: return Result.failure(IllegalArgumentException("invalid USSD code"))
@@ -52,10 +57,12 @@ class UssdHelper @Inject constructor(
             )
         }
 
+        val resolvedSubId = subscriptionId ?: resolveSubscriptionIdForSimSlot(simSlot)
+
         // Telephony API cannot walk interactive menus — skip it when steps are provided.
         if (steps.isEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val apiResult = withTimeoutOrNull(API_TIMEOUT_MS) {
-                sendViaTelephonyApi(normalized, subscriptionId)
+                sendViaTelephonyApi(normalized, resolvedSubId)
             }
             when {
                 apiResult == null -> RouteBotLog.w("ussd_api_timeout", mapOf("code" to normalized))
@@ -67,7 +74,41 @@ class UssdHelper @Inject constructor(
             }
         }
 
-        return sendViaDialCapture(normalized, subscriptionId, steps)
+        return sendViaDialCapture(normalized, resolvedSubId, steps)
+    }
+
+    /**
+     * Map API `sim_slot` (1 = SIM 1, 2 = SIM 2) to Android subscription id.
+     * Returns null when [simSlot] is null so dialer uses the default voice SIM.
+     */
+    fun resolveSubscriptionIdForSimSlot(simSlot: Int?): Int? {
+        if (simSlot == null) return null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            RouteBotLog.w("ussd_sim_slot_no_permission", mapOf("sim_slot" to simSlot))
+            return null
+        }
+        val apiSlot = SimSlots.normalizeApiSimSlot(simSlot)
+        val androidSlot = SimSlots.toAndroidSlotIndex(apiSlot)
+        return try {
+            val sm = context.getSystemService(SubscriptionManager::class.java) ?: return null
+            val subs = sm.activeSubscriptionInfoList.orEmpty()
+            val matched = subs.firstOrNull { it.simSlotIndex == androidSlot }
+                ?: subs.sortedBy { it.simSlotIndex.takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }
+                    .getOrNull(androidSlot)
+            matched?.subscriptionId.also {
+                if (it == null) {
+                    RouteBotLog.w(
+                        "ussd_sim_slot_not_found",
+                        mapOf("sim_slot" to apiSlot, "active" to subs.size)
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            RouteBotLog.w("ussd_sim_slot_resolve_failed", mapOf("error" to (e.message ?: "")))
+            null
+        }
     }
 
     private suspend fun sendViaTelephonyApi(

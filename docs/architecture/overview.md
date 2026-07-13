@@ -42,3 +42,8 @@ flowchart LR
 - Webhooks: HMAC-SHA256 over `timestamp.body` + skew check
 - Agent secrets: Android Keystore + EncryptedSharedPreferences
 - Media at rest on device: AES-GCM before upload; delete after successful send
+
+## Dual-SIM
+
+Operators select SIMs with **1-based** tray numbers (`1` = SIM 1, `2` = SIM 2) on SMS and USSD
+commands. See [sim-slots.md](sim-slots.md).

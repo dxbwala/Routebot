@@ -120,6 +120,7 @@ CI runs this automatically with Postgres/Redis service containers — see [`.git
 - Certificate pinning: configure pins via the Settings screen (stored via `SecureStorageRepository.saveCertificatePins`); leave empty to rely on standard CA trust.
 - The local Room database is encrypted at rest with SQLCipher; the passphrase is generated once and stored in Android Keystore-backed `EncryptedSharedPreferences` (`DbPassphraseProvider`), never in plaintext.
 - See [platform-limitations.md](architecture/platform-limitations.md) for CPU/SIM caveats and SMS delivery report behavior.
+- Dual-SIM tray numbering (`1` = SIM 1, `2` = SIM 2): [sim-slots.md](architecture/sim-slots.md).
 
 ## Android release signing
 

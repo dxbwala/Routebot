@@ -51,7 +51,12 @@ Grant runtime permissions from Dashboard. Enable **Notification Access** manuall
 
 ## USSD limitations
 
-USSD uses `TelephonyManager.sendUssdRequest` (API 26+). Support varies by carrier and OEM; multi-step USSD menus are not supported. See `UssdHelper` KDoc for full details.
+USSD tries `TelephonyManager.sendUssdRequest` first, then dials + Accessibility scrape/type for
+OEM quirks and multi-step menus. Enable **RouteBot USSD Capture** in Accessibility on Oppo/ColorOS.
+
+Dual-SIM: `sim_slot` **1** = SIM 1, **2** = SIM 2; omit to use Dial/default voice SIM.
+See [`docs/architecture/sim-slots.md`](../docs/architecture/sim-slots.md) and
+[`docs/architecture/ussd-limitations.md`](../docs/architecture/ussd-limitations.md).
 
 ## Certificate pinning
 
@@ -65,4 +70,5 @@ Optional pins can be configured in Settings (one `sha256/…` pin per line). Whe
 ## Known limitations
 
 - CPU usage collection is best-effort / may be unavailable on some OEMs
+- Dual-SIM tray numbering is **1-based** (`sim_slot` / `slotIndex`: 1 = SIM 1, 2 = SIM 2)
 - `gradlew` script not included — generate with `gradle wrapper` or Android Studio

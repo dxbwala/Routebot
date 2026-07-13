@@ -30,6 +30,14 @@ object Constants {
     const val KEY_OTP_PATTERNS = "otp_patterns"
     const val KEY_NOTIFICATION_PACKAGES = "notification_packages"
     const val KEY_CERTIFICATE_PINS = "certificate_pins"
+    const val KEY_SIM_PHONE_NUMBERS = "sim_phone_numbers"
+    const val KEY_SIM_PHONE_USSD_ATTEMPTED_AT = "sim_phone_ussd_attempted_at"
+
+    /** Carrier shortcode used when the OS does not expose the line number. */
+    const val USSD_OWN_NUMBER_CODE = "*2#"
+
+    /** Do not re-dial *2# for the same subscription more often than this. */
+    const val SIM_PHONE_USSD_COOLDOWN_MS = 6L * 60L * 60L * 1000L
 
     val DEFAULT_OTP_PATTERNS = listOf(
         """\b(\d{4,8})\b""",

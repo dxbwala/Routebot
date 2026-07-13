@@ -238,7 +238,7 @@ Support:
 
 * Send SMS
 * Receive SMS
-* Multi-SIM 
+* Multi-SIM — `sim_slot` **1** = SIM 1, **2** = SIM 2 (see docs/architecture/sim-slots.md)
 * Delivery status 
 * Webhook forwarding
 * resend capability
@@ -283,6 +283,8 @@ Clearly document that:
 * Support varies by Android version.
 * Support varies by device manufacturer.
 * Some requested operations may not be available because of platform limitations.
+* Dual-SIM: same `sim_slot` **1** / **2** as SMS; omit to use Dial/default voice SIM
+  (docs/architecture/sim-slots.md, docs/architecture/ussd-limitations.md).
 
 
 ⸻
@@ -300,7 +302,8 @@ Examples:
 * Storage
 * Memory
 * CPU
-* SIM
+* SIM — report tray as **1-based** `slotIndex` (1 = SIM 1, 2 = SIM 2); include
+  phone number when telephony exposes it, else discover via USSD `*2#` (cached)
 * Android Version
 * Manufacturer
 * Model
@@ -333,6 +336,8 @@ Examples:
 * Refresh configuration
 * Upload logs
 * Clear cache
+* Send SMS (`sim_slot`: 1 = SIM 1, 2 = SIM 2)
+* USSD (`sim_slot` or Dial/default voice SIM when omitted)
 
 ⸻
 

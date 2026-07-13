@@ -24,7 +24,8 @@ Routebot/
 ├── deploy/nginx/            # nginx.conf, proxy_params.conf, Dockerfile, entrypoint
 ├── docs/
 │   ├── api/                 # rest.md, websocket.md
-│   ├── architecture/        # database, folder-structure, sequences, platform-limitations
+│   ├── architecture/        # database, folder-structure, sequences, platform-limitations,
+│   │                        # ussd-limitations, sim-slots
 │   ├── AGENT.md
 │   ├── PRD.md
 │   └── deployment.md

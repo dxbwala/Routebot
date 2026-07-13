@@ -20,3 +20,5 @@ go test ./...
 ## Layout
 
 See [architecture overview](../docs/architecture/overview.md).
+
+Dual-SIM command payloads (`sim_slot` 1|2): [sim-slots.md](../docs/architecture/sim-slots.md).

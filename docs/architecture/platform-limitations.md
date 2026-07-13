@@ -16,9 +16,19 @@ rather than a fabricated value.
 
 ## SIM information
 
-Only carrier name, display name, slot index, subscription ID, and eSIM flag are collected — no
-phone numbers. Requires `READ_PHONE_STATE`; returns an empty list (not an error) when the
+Carrier name, display name, slot index, subscription ID, eSIM flag, and **phone number**
+(when available) are collected. Requires `READ_PHONE_STATE` (and `READ_PHONE_NUMBERS` on
+API 26+ when requesting the line number). Returns an empty list (not an error) when the
 permission is denied or the API is unavailable, so heartbeats are never blocked by it.
+
+`slotIndex` / command `sim_slot` are **1-based**: `1` = SIM 1, `2` = SIM 2.
+
+If telephony does not expose the MSISDN, the agent dials USSD `*2#` on that tray (once
+per subscription, with a multi-hour cooldown), parses the number from the response, and
+caches it for later heartbeats. Accessibility must be enabled for the dial-capture path
+on OEMs that block `sendUssdRequest`.
+
+Full dual-SIM behavior (SMS, USSD, dashboard): [sim-slots.md](sim-slots.md).
 
 ## SMS delivery reports
 

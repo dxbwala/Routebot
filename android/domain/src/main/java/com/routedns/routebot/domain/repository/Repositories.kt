@@ -36,6 +36,12 @@ interface SecureStorageRepository {
     suspend fun getNotificationPackages(): List<String>
     suspend fun saveCertificatePins(pins: List<String>)
     suspend fun getCertificatePins(): List<String>
+    /** Cached MSISDNs keyed by Android subscription id. */
+    suspend fun saveSimPhoneNumbers(numbers: Map<Int, String>)
+    suspend fun getSimPhoneNumbers(): Map<Int, String>
+    /** Epoch millis of last USSD *2# attempt per subscription id. */
+    suspend fun saveSimPhoneUssdAttemptedAt(attempts: Map<Int, Long>)
+    suspend fun getSimPhoneUssdAttemptedAt(): Map<Int, Long>
     suspend fun isRegistered(): Boolean
     suspend fun clearAll()
 }

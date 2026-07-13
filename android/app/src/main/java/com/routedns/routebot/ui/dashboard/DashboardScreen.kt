@@ -109,14 +109,17 @@ fun DashboardScreen(viewModel: DashboardViewModel, onSettings: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    val permissions = listOf(
-        Manifest.permission.RECEIVE_SMS to "SMS Receive",
-        Manifest.permission.SEND_SMS to "SMS Send",
-        Manifest.permission.CALL_PHONE to "Call Phone (USSD)",
-        Manifest.permission.READ_PHONE_STATE to "Phone State",
-        Manifest.permission.POST_NOTIFICATIONS to "Notifications",
-        Manifest.permission.CAMERA to "Camera"
-    ).map { (perm, label) ->
+    val permissions = buildList {
+        add(Manifest.permission.RECEIVE_SMS to "SMS Receive")
+        add(Manifest.permission.SEND_SMS to "SMS Send")
+        add(Manifest.permission.CALL_PHONE to "Call Phone (USSD)")
+        add(Manifest.permission.READ_PHONE_STATE to "Phone State")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            add(Manifest.permission.READ_PHONE_NUMBERS to "Phone Numbers")
+        }
+        add(Manifest.permission.POST_NOTIFICATIONS to "Notifications")
+        add(Manifest.permission.CAMERA to "Camera")
+    }.map { (perm, label) ->
         PermissionStatus(label, ContextCompat.checkSelfPermission(context, perm) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED)
     }

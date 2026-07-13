@@ -11,12 +11,12 @@ and are idempotent (safe to re-run).
 | `users` | Dashboard accounts |
 | `refresh_tokens` | Refresh token hashes |
 | `devices` | Registered agents + API key hash + encrypted API key copy (for request signing) |
-| `device_heartbeats` | Telemetry samples (battery, storage, RAM, CPU, network, SIM, ...) |
-| `sms_messages` | Inbound/outbound SMS + delivery status |
+| `device_heartbeats` | Telemetry samples (battery, storage, RAM, CPU, network, SIM `sim_info`, ...) |
+| `sms_messages` | Inbound/outbound SMS + delivery status (`sim_slot` **1** = SIM 1, **2** = SIM 2) |
 | `otp_events` | Extracted OTPs |
 | `notification_events` | Notification gateway |
 | `call_events` | Call monitor |
-| `commands` | Remote command queue |
+| `commands` | Remote command queue (`send_sms` / `ussd` payloads may include `sim_slot`) |
 | `media_uploads` | Agent log-upload metadata |
 | `webhook_endpoints` | Customer webhook config |
 | `webhook_deliveries` | Delivery attempts + idempotency |
@@ -34,3 +34,10 @@ signature the device sends on every agent request — see [rest.md](../api/rest.
 - `online` — recent heartbeat / WS connected
 - `offline` — stale beyond `OFFLINE_THRESHOLD_SECONDS`
 - `disabled` — manually blocked
+
+## Dual-SIM columns / JSON
+
+- `sms_messages.sim_slot` — integer **1** or **2** (physical tray)
+- `device_heartbeats.sim_info` — JSON array with `slotIndex` **1** / **2**, `subscriptionId`, carrier/display names
+
+See [sim-slots.md](sim-slots.md).

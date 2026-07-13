@@ -18,6 +18,7 @@ import com.routedns.routebot.monitor.CallStateMonitor
 import com.routedns.routebot.service.AgentServiceController
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.serialization.encodeToString
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
@@ -29,7 +30,9 @@ class HealthSyncWorker @AssistedInject constructor(
     private val agentApi: AgentApiRepository,
     private val deviceMonitor: DeviceMonitor,
     private val serviceController: AgentServiceController,
-    private val callStateMonitor: CallStateMonitor
+    private val callStateMonitor: CallStateMonitor,
+    private val simPhoneDiscovery: com.routedns.routebot.ussd.SimPhoneDiscovery,
+    private val json: kotlinx.serialization.json.Json
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -37,6 +40,7 @@ class HealthSyncWorker @AssistedInject constructor(
         RouteBotLog.i("health_sync_start")
         callStateMonitor.start()
         serviceController.startAgent()
+        runCatching { simPhoneDiscovery.ensurePhoneNumbers() }
         val snapshot = deviceMonitor.collect(BuildConfig.VERSION_NAME)
         agentApi.sendHeartbeat(
             DeviceHeartbeat(
@@ -44,9 +48,11 @@ class HealthSyncWorker @AssistedInject constructor(
                 isCharging = snapshot.isCharging,
                 storageFreeMb = snapshot.storageFreeMb,
                 ramFreeMb = snapshot.ramFreeMb,
+                cpuUsage = snapshot.cpuUsage,
                 networkType = snapshot.networkType,
                 wifiSsid = snapshot.wifiSsid,
                 signalStrength = snapshot.signalStrength,
+                simInfo = json.parseToJsonElement(json.encodeToString(snapshot.simInfo)),
                 reportedAt = Instant.now().toString()
             )
         )
