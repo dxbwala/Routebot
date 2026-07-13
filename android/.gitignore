@@ -11,3 +11,8 @@
 *.ap_
 *.aab
 output.json
+
+# Release signing — never commit the real keystore or its credentials.
+*.jks
+*.keystore
+keystore.properties

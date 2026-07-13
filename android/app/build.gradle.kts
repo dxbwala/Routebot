@@ -7,6 +7,30 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * Release signing is configured entirely from environment variables so the real keystore and
+ * its credentials are never written into the repo or Gradle files:
+ *
+ *   ROUTEBOT_KEYSTORE_PATH      absolute path to the .jks/.keystore file
+ *   ROUTEBOT_KEYSTORE_PASSWORD  keystore password
+ *   ROUTEBOT_KEY_ALIAS          key alias inside the keystore
+ *   ROUTEBOT_KEY_PASSWORD       key password (often same as keystore password)
+ *
+ * CI (see .github/workflows/android-release.yml) decodes the keystore from a base64 secret and
+ * sets these before running `bundleRelease` / `assembleRelease`. Locally, export the same four
+ * variables yourself (e.g. in your shell profile, never in a committed file) to produce a signed
+ * release build. Without them, `release` builds remain unsigned — safe for local experimentation,
+ * but not distributable.
+ */
+val releaseKeystorePath = System.getenv("ROUTEBOT_KEYSTORE_PATH")
+val releaseKeystorePassword = System.getenv("ROUTEBOT_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("ROUTEBOT_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("ROUTEBOT_KEY_PASSWORD")
+val hasReleaseSigning = !releaseKeystorePath.isNullOrBlank() &&
+    !releaseKeystorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.routedns.routebot"
     compileSdk = 35
@@ -16,8 +40,19 @@ android {
         applicationId = "com.routedns.routebot"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = (project.findProperty("routebotVersionCode") as String?)?.toIntOrNull() ?: 1
+        versionName = project.findProperty("routebotVersionName") as String? ?: "1.0.0"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -27,6 +62,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false

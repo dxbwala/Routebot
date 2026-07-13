@@ -107,10 +107,61 @@ CI runs this automatically with Postgres/Redis service containers — see [`.git
 - `android/app/src/main/res/xml/network_security_config.xml` is the **release** default: cleartext HTTP is disabled, only system trust anchors are used.
 - `android/app/src/debug/res/xml/network_security_config.xml` overrides this for **debug** builds only, allowing cleartext to a local/LAN API for development. This override is never included in a release build (verified by inspecting `merged_res/release`).
 - Certificate pinning: configure pins via the Settings screen (stored via `SecureStorageRepository.saveCertificatePins`); leave empty to rely on standard CA trust.
-- Release builds are not yet signed with a production keystore — set up Play App Signing or a dedicated release keystore before publishing.
 - The local Room database is encrypted at rest with SQLCipher; the passphrase is generated once and stored in Android Keystore-backed `EncryptedSharedPreferences` (`DbPassphraseProvider`), never in plaintext.
 - Captured audio/video/screenshots are encrypted with an Android Keystore-backed AES-GCM key (hardware-backed where available) before upload, then deleted — the key itself never leaves the keystore or touches disk.
 - See [platform-limitations.md](architecture/platform-limitations.md) for the screenshot consent flow, video/CPU/SIM caveats, and SMS delivery report behavior.
+
+## Android release signing
+
+Release builds are signed from environment variables (`android/app/build.gradle.kts`), never
+from a keystore committed to the repo.
+
+### One-time setup
+
+```bash
+cd android
+./scripts/generate-release-keystore.sh
+```
+
+This generates `android/release.jks` (gitignored) and prints a base64-encoded copy. Back the
+`.jks` file up somewhere safe outside git — **losing it means you can never publish an update
+to the same app listing again.**
+
+Add these to the GitHub repo (Settings → Secrets and variables → Actions → New repository secret):
+
+| Secret | Value |
+|--------|-------|
+| `ANDROID_RELEASE_KEYSTORE_BASE64` | base64 output from the script above |
+| `ANDROID_KEYSTORE_PASSWORD` | the keystore password you entered |
+| `ANDROID_KEY_ALIAS` | `routebot` (default from the script) |
+| `ANDROID_KEY_PASSWORD` | the key password you entered |
+
+### Building a signed release locally
+
+Export the same four values as environment variables (`ROUTEBOT_KEYSTORE_PATH`,
+`ROUTEBOT_KEYSTORE_PASSWORD`, `ROUTEBOT_KEY_ALIAS`, `ROUTEBOT_KEY_PASSWORD`) — never in a
+committed file — then:
+
+```bash
+./gradlew :app:assembleRelease :app:bundleRelease
+```
+
+Without those variables set, `release` builds remain **unsigned** (safe for local
+experimentation, not distributable).
+
+### Publishing via CI
+
+Workflow: [`.github/workflows/android-release.yml`](../.github/workflows/android-release.yml).
+
+```bash
+git tag android-v1.0.0
+git push origin android-v1.0.0
+```
+
+This builds a signed APK + AAB (versionCode = the CI run number, versionName = the tag's
+version), verifies the APK signature with `apksigner`, and publishes both files to a new GitHub
+Release. You can also trigger it manually from the Actions tab with a version input
+(`workflow_dispatch`) without pushing a tag first.
 
 ## Production checklist
 
@@ -128,10 +179,10 @@ CI runs this automatically with Postgres/Redis service containers — see [`.git
 - [x] Crash reporting (uncaught exception handler → persisted + uploaded next launch)
 - [x] SMS delivery reports (real sent/delivered callbacks, not hardcoded status)
 - [x] Integration test suite (real HTTP + Postgres + Redis) running in CI
+- [x] Android release builds signed with a production keystore via CI (`android-release.yml`)
 - [ ] Configure certificate pinning pins for your domain in the Android agent settings
 - [ ] Back up Postgres; retain Valkey as ephemeral presence cache
 - [ ] Configure webhook endpoints as HTTPS only
-- [ ] Sign Android release builds with a production keystore
 - [ ] Add structured metrics/tracing and log shipping
 
 ## Android CI APK
