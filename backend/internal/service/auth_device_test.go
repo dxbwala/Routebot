@@ -34,6 +34,23 @@ func (m *memUsers) Create(_ context.Context, user *domain.User) error {
 	return nil
 }
 
+func (m *memUsers) UpsertByEmail(_ context.Context, user *domain.User) error {
+	if existing, ok := m.byEmail[user.Email]; ok {
+		existing.PasswordHash = user.PasswordHash
+		existing.DisplayName = user.DisplayName
+		existing.Role = user.Role
+		existing.IsActive = true
+		existing.UpdatedAt = time.Now().UTC()
+		user.ID = existing.ID
+		user.IsActive = true
+		user.CreatedAt = existing.CreatedAt
+		user.UpdatedAt = existing.UpdatedAt
+		m.byID[existing.ID] = existing
+		return nil
+	}
+	return m.Create(context.Background(), user)
+}
+
 func (m *memUsers) GetByEmail(_ context.Context, email string) (*domain.User, error) {
 	u, ok := m.byEmail[email]
 	if !ok {
@@ -97,6 +114,23 @@ func TestAuthRegisterLogin(t *testing.T) {
 		Email: "a@b.com", Password: "wrongpass",
 	}, "127.0.0.1")
 	require.ErrorIs(t, err, service.ErrUnauthorized)
+}
+
+func TestEnsureBootstrapAdmin(t *testing.T) {
+	tokens := auth.NewManager("01234567890123456789012345678901", time.Minute, time.Hour)
+	svc := service.NewAuthService(newMemUsers(), &memRefresh{}, tokens, nopAudit{}, time.Hour)
+
+	require.NoError(t, svc.EnsureBootstrapAdmin(context.Background(), "admin@routedns.io", "RouteBotAdmin123!", "Admin"))
+	_, _, err := svc.Login(context.Background(), service.LoginInput{
+		Email: "admin@routedns.io", Password: "RouteBotAdmin123!",
+	}, "127.0.0.1")
+	require.NoError(t, err)
+
+	require.NoError(t, svc.EnsureBootstrapAdmin(context.Background(), "admin@routedns.io", "NewAdminPass123!", "Admin"))
+	_, _, err = svc.Login(context.Background(), service.LoginInput{
+		Email: "admin@routedns.io", Password: "NewAdminPass123!",
+	}, "127.0.0.1")
+	require.NoError(t, err)
 }
 
 type memDevices struct {

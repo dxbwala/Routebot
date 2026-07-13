@@ -73,6 +73,13 @@ func main() {
 	tokens := auth.NewManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 
 	authSvc := service.NewAuthService(userRepo, refreshRepo, tokens, auditRepo, cfg.JWTRefreshTTL)
+	if err := authSvc.EnsureBootstrapAdmin(ctx, cfg.AdminEmail, cfg.AdminPassword, cfg.AdminDisplayName); err != nil {
+		log.Error("bootstrap admin failed", map[string]any{"error": err.Error()})
+		os.Exit(1)
+	}
+	if cfg.AdminEmail != "" {
+		log.Info("bootstrap admin ready", map[string]any{"email": cfg.AdminEmail})
+	}
 	deviceSvc := service.NewDeviceService(deviceRepo, hbRepo, presence, cfg.DeviceAPIKeyPepper, cfg.RequestSigningKey, cfg.RequestSignatureMaxSkew, cfg.OfflineThresholdSeconds, auditRepo, dispatcher)
 	eventSvc := service.NewEventService(smsRepo, otpRepo, notifRepo, callRepo, deviceRepo, dispatcher)
 	cmdSvc := service.NewCommandService(cmdRepo, deviceRepo, hub, auditRepo, dispatcher)

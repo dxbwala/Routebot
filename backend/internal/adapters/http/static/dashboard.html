@@ -7,198 +7,1070 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a222c;
+      --bg: #0b1117;
+      --panel: #141c26;
+      --panel-2: #1a2430;
+      --line: #2a3645;
       --text: #e8eef4;
       --muted: #8b9aab;
       --accent: #3d9cfd;
+      --accent-dim: #1e4f7a;
       --ok: #3ecf8e;
+      --warn: #f0b429;
       --err: #ff6b6b;
+      --offline: #6b7a8a;
+      --sidebar-w: 280px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top: env(safe-area-inset-top, 0px);
     }
     * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      min-height: 100dvh;
+      font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
       background:
-        radial-gradient(1200px 600px at 10% -10%, #1c3a5a 0%, transparent 55%),
-        radial-gradient(900px 500px at 100% 0%, #163028 0%, transparent 50%),
+        radial-gradient(1000px 500px at 0% -10%, #16324a 0%, transparent 55%),
+        radial-gradient(800px 400px at 100% 0%, #12261f 0%, transparent 50%),
         var(--bg);
       color: var(--text);
+      overflow-x: hidden;
     }
-    main {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 48px 20px 80px;
-    }
-    h1 {
-      font-family: "IBM Plex Serif", Georgia, serif;
-      font-weight: 600;
-      font-size: clamp(2rem, 5vw, 2.8rem);
-      margin: 0 0 8px;
-      letter-spacing: -0.02em;
-    }
-    .sub { color: var(--muted); margin-bottom: 32px; }
-    .panel {
-      background: color-mix(in srgb, var(--panel) 92%, white 8%);
-      border: 1px solid #2a3542;
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 20px;
-    }
-    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
-    input {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 10px;
-      border: 1px solid #334155;
-      background: #0d1218;
-      color: var(--text);
-      margin-bottom: 14px;
-      font-size: 1rem;
-    }
+    a { color: var(--accent); }
+    button, input, select, textarea { font: inherit; }
     button {
       appearance: none;
       border: 0;
       border-radius: 10px;
-      padding: 12px 18px;
+      padding: 10px 14px;
+      min-height: 44px;
       background: var(--accent);
       color: #041018;
       font-weight: 650;
       cursor: pointer;
-      font-size: 0.95rem;
+      touch-action: manipulation;
     }
     button.secondary { background: #2a3542; color: var(--text); }
+    button.danger { background: #5a2430; color: #ffd0d0; }
+    button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    #qrWrap {
-      display: none;
-      text-align: center;
-      padding: 12px 0 4px;
+    button.small { padding: 8px 12px; min-height: 40px; font-size: 0.85rem; }
+    button.icon-btn {
+      width: 44px;
+      min-width: 44px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
     }
+    input, select, textarea {
+      width: 100%;
+      max-width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0d1218;
+      color: var(--text);
+      margin-bottom: 10px;
+      font-size: 16px; /* avoid iOS zoom */
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin: 0 0 6px; }
+    .auth {
+      width: min(420px, calc(100% - 32px));
+      margin: max(8vh, 24px) auto;
+      padding: 22px 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    .auth h1 {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      margin: 0 0 6px;
+      font-size: clamp(1.6rem, 6vw, 2rem);
+    }
+    .auth .sub { color: var(--muted); margin: 0 0 22px; line-height: 1.4; }
+    .auth .row button { flex: 1 1 auto; min-width: 120px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .status { min-height: 1.3em; margin-top: 8px; font-size: 0.9rem; word-break: break-word; }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+    .meta { color: var(--muted); font-size: 0.85rem; }
+
+    .shell { display: none; min-height: 100vh; min-height: 100dvh; }
+    .shell.on { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+    .mobile-bar {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      align-items: center;
+      gap: 10px;
+      padding: calc(10px + var(--safe-top)) 12px 10px;
+      background: color-mix(in srgb, var(--panel) 92%, black 8%);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+    .mobile-bar .title {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-size: 1.15rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 50;
+    }
+    .sidebar {
+      background: color-mix(in srgb, var(--panel) 96%, black 4%);
+      border-right: 1px solid var(--line);
+      padding: 18px 14px calc(18px + var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      position: sticky;
+      top: 0;
+      overflow: auto;
+    }
+    .brand {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-size: 1.35rem;
+      padding: 4px 8px 12px;
+    }
+    .sidebar-nav { display: flex; flex-direction: column; gap: 8px; }
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid transparent;
+    }
+    .nav-btn.active { background: var(--accent-dim); border-color: #2f6aa3; color: #fff; }
+    .sidebar-spacer { flex: 1; min-height: 12px; }
+    .device-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: min(48vh, 420px);
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .device-item {
+      text-align: left;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      width: 100%;
+      min-height: 52px;
+    }
+    .device-item.active { border-color: var(--accent); }
+    .device-item .name { font-weight: 600; word-break: break-word; }
+    .device-item .meta { color: var(--muted); font-size: 0.8rem; margin-top: 4px; line-height: 1.35; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .pill.online { background: #163528; color: var(--ok); }
+    .pill.offline { background: #243040; color: var(--offline); }
+    .pill.disabled { background: #3a1c22; color: var(--err); }
+
+    .main {
+      padding: 18px 20px calc(48px + var(--safe-bottom));
+      min-width: 0;
+      width: 100%;
+      overflow-x: hidden;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .topbar h2 { margin: 0; font-size: clamp(1.15rem, 4vw, 1.35rem); }
+    .panel {
+      background: color-mix(in srgb, var(--panel) 94%, white 6%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+      min-width: 0;
+    }
+    .panel h3 { margin: 0 0 12px; font-size: 1rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .kv {
+      display: grid;
+      grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
+      gap: 8px 10px;
+      font-size: 0.92rem;
+    }
+    .kv span { min-width: 0; word-break: break-word; }
+    .kv span:first-child { color: var(--muted); }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+      margin: 0 -4px 12px;
+      padding: 2px 4px 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .tab {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .tab.active { background: #243447; color: var(--text); border-color: #3a516b; }
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 0 -2px;
+      padding-bottom: 4px;
+    }
+    table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 0.88rem; }
+    th, td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid #243041;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+    .empty { color: var(--muted); padding: 18px 4px; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+    }
+    #qrWrap { text-align: center; display: none; }
     #qr {
       display: inline-block;
-      padding: 16px;
+      max-width: min(280px, 100%);
+      height: auto;
+      padding: 12px;
       background: #fff;
       border-radius: 12px;
     }
-    .hint { color: var(--muted); font-size: 0.92rem; margin-top: 14px; line-height: 1.45; }
-    .status { min-height: 1.4em; margin-top: 10px; font-size: 0.9rem; }
-    .status.ok { color: var(--ok); }
-    .status.err { color: var(--err); }
-    .token {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.75rem;
-      color: var(--muted);
-      word-break: break-all;
-      margin-top: 10px;
+    .cmd-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+      gap: 8px;
+    }
+    .cmd-grid button { width: 100%; }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 6px; background: var(--offline);
+      flex: 0 0 auto;
+    }
+    .live-dot.on { background: var(--ok); box-shadow: 0 0 0 3px #1d3d2c; }
+    .hidden { display: none !important; }
+    .back-devices { display: none; margin-bottom: 10px; }
+    .devices-layout.selected-mobile #fleetPanel { display: none; }
+    .devices-layout.selected-mobile .back-devices { display: inline-flex; }
+
+    @media (max-width: 900px) {
+      .shell.on { grid-template-columns: 1fr; }
+      .mobile-bar { display: flex; }
+      .sidebar-backdrop.open { display: block; }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(var(--sidebar-w), 86vw);
+        z-index: 60;
+        transform: translateX(-105%);
+        transition: transform 0.2s ease;
+        border-right: 1px solid var(--line);
+        box-shadow: 12px 0 40px rgba(0, 0, 0, 0.35);
+      }
+      .shell.nav-open .sidebar { transform: translateX(0); }
+      .main { padding: 14px 12px calc(28px + var(--safe-bottom)); }
+      .grid-2 { grid-template-columns: 1fr; }
+      .device-list { max-height: none; }
+      .panel { padding: 14px 12px; border-radius: 12px; }
+      .cmd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .brand { display: none; }
+    }
+
+    @media (max-width: 560px) {
+      .auth { width: calc(100% - 24px); margin: 16px auto; padding: 18px 14px; }
+      .kv { grid-template-columns: 1fr; gap: 2px 0; }
+      .kv span:first-child { margin-top: 6px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+      .cmd-grid { grid-template-columns: 1fr 1fr; }
+      table { min-width: 460px; font-size: 0.82rem; }
+      th, td { padding: 8px 6px; }
+      .row > button { flex: 1 1 calc(50% - 4px); }
     }
   </style>
 </head>
 <body>
-  <main>
+  <section class="auth" id="authView">
     <h1>RouteBot</h1>
-    <p class="sub">Show a QR code. Scan it with the RouteBot Android app to connect automatically.</p>
+    <p class="sub">Sign in to manage devices, send commands, and view live telemetry.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" value="admin@routedns.io" />
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+    <div class="row">
+      <button id="loginBtn" type="button">Sign in</button>
+      <button id="registerBtn" class="secondary" type="button">Create account</button>
+    </div>
+    <div class="status" id="loginStatus"></div>
+  </section>
 
-    <section class="panel" id="loginPanel">
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="username" placeholder="admin@example.com" />
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
-      <div class="row">
-        <button id="loginBtn" type="button">Sign in</button>
-        <button id="registerBtn" class="secondary" type="button">Create account</button>
+  <div class="shell" id="appView">
+    <div class="mobile-bar" id="mobileBar">
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="Open menu">☰</button>
+      <div class="title" id="mobileTitle">Devices</div>
+      <button class="icon-btn secondary" id="mobileRefreshBtn" type="button" aria-label="Refresh">↻</button>
+    </div>
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">RouteBot</div>
+      <div class="sidebar-nav">
+        <button class="nav-btn active" data-view="devices" type="button">Devices</button>
+        <button class="nav-btn" data-view="pair" type="button">Pair device (QR)</button>
+        <button class="nav-btn" data-view="webhooks" type="button">Webhooks</button>
       </div>
-      <div class="status" id="loginStatus"></div>
-    </section>
+      <div class="sidebar-spacer"></div>
+      <button class="nav-btn ghost" id="refreshDevicesBtn" type="button">Refresh devices</button>
+      <button class="nav-btn ghost" id="logoutBtn" type="button">Sign out</button>
+    </aside>
 
-    <section class="panel" id="pairPanel" hidden>
-      <label for="deviceName">Device name (optional)</label>
-      <input id="deviceName" type="text" placeholder="Warehouse phone 1" />
-      <div class="row">
-        <button id="qrBtn" type="button">Generate QR</button>
-        <button id="logoutBtn" class="secondary" type="button">Sign out</button>
+    <section class="main">
+      <div id="viewDevices">
+        <div class="topbar">
+          <h2>Devices</h2>
+          <div class="row">
+            <span class="status" id="devicesStatus"></span>
+          </div>
+        </div>
+        <div class="devices-layout" id="devicesLayout">
+          <button class="back-devices secondary small" id="backDevicesBtn" type="button">← All devices</button>
+          <div class="grid-2">
+            <div class="panel" id="fleetPanel">
+              <h3>Fleet</h3>
+              <div class="device-list" id="deviceList"><div class="empty">No devices yet — pair one with QR.</div></div>
+            </div>
+            <div class="panel" id="deviceDetail">
+              <div class="empty">Select a device</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel hidden" id="deviceWorkbench">
+          <div class="tabs" id="detailTabs">
+            <button class="tab active" data-tab="commands" type="button">Commands</button>
+            <button class="tab" data-tab="health" type="button">Health</button>
+            <button class="tab" data-tab="sms" type="button">SMS</button>
+            <button class="tab" data-tab="otp" type="button">OTP</button>
+            <button class="tab" data-tab="notifications" type="button">Notifications</button>
+            <button class="tab" data-tab="calls" type="button">Calls</button>
+            <button class="tab" data-tab="media" type="button">Media</button>
+            <button class="tab" data-tab="history" type="button">Command history</button>
+          </div>
+          <div id="tabCommands">
+            <h3>Remote commands</h3>
+            <div class="cmd-grid" id="quickCmds"></div>
+            <div class="grid-2" style="margin-top:14px">
+              <div>
+                <h3>Send SMS</h3>
+                <label>Address</label>
+                <input id="smsAddress" placeholder="+15551234567" />
+                <label>Body</label>
+                <textarea id="smsBody" placeholder="Message text"></textarea>
+                <label>SIM slot</label>
+                <input id="smsSlot" type="number" value="0" min="0" />
+                <button id="sendSmsBtn" type="button">Queue send_sms</button>
+              </div>
+              <div>
+                <h3>USSD</h3>
+                <label>Code</label>
+                <input id="ussdCode" placeholder="*121#" />
+                <label>Subscription ID (optional)</label>
+                <input id="ussdSub" type="number" placeholder="leave blank" />
+                <button id="sendUssdBtn" type="button">Queue ussd</button>
+                <h3 style="margin-top:18px">Custom JSON payload</h3>
+                <label>Command type</label>
+                <select id="customType"></select>
+                <label>Payload JSON</label>
+                <textarea id="customPayload" placeholder='{"key":"value"}'>{}</textarea>
+                <button id="sendCustomBtn" class="secondary" type="button">Queue command</button>
+              </div>
+            </div>
+            <div class="status" id="cmdStatus"></div>
+          </div>
+          <div id="tabHealth" class="hidden">
+            <div class="row" style="margin-bottom:10px">
+              <span class="live-dot" id="liveDot"></span>
+              <span id="liveLabel" class="meta">Live stream idle</span>
+              <button class="small secondary" id="reloadHealthBtn" type="button">Reload</button>
+            </div>
+            <div id="healthLatest" class="kv"></div>
+            <h3 style="margin-top:16px">History</h3>
+            <div id="healthHistory"></div>
+          </div>
+          <div id="tabSms" class="hidden"></div>
+          <div id="tabOtp" class="hidden"></div>
+          <div id="tabNotifications" class="hidden"></div>
+          <div id="tabCalls" class="hidden"></div>
+          <div id="tabMedia" class="hidden"></div>
+          <div id="tabHistory" class="hidden"></div>
+        </div>
       </div>
-      <div id="qrWrap">
-        <canvas id="qr"></canvas>
-        <p class="hint">Open RouteBot → <strong>Scan QR</strong> and point the camera here.<br/>Code expires in 10 minutes and can be used once.</p>
-        <div class="token" id="tokenText"></div>
+
+      <div id="viewPair" class="hidden">
+        <div class="topbar"><h2>Pair device</h2></div>
+        <div class="panel" style="max-width:520px;width:100%">
+          <label for="deviceName">Device name (optional)</label>
+          <input id="deviceName" type="text" placeholder="Warehouse phone 1" />
+          <div class="row">
+            <button id="qrBtn" type="button">Generate QR</button>
+          </div>
+          <div id="qrWrap">
+            <canvas id="qr"></canvas>
+            <p class="status ok">Scan with RouteBot → Scan QR. Token expires in 10 minutes.</p>
+            <div class="mono" id="tokenText"></div>
+          </div>
+          <div class="status" id="pairStatus"></div>
+        </div>
       </div>
-      <div class="status" id="pairStatus"></div>
+
+      <div id="viewWebhooks" class="hidden">
+        <div class="topbar"><h2>Webhooks</h2></div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3>Create webhook</h3>
+            <label>Name</label>
+            <input id="hookName" placeholder="Ops alerts" />
+            <label>URL</label>
+            <input id="hookUrl" placeholder="https://example.com/hooks/routebot" />
+            <label>Secret</label>
+            <input id="hookSecret" placeholder="shared secret" />
+            <label>Event types (comma-separated)</label>
+            <input id="hookEvents" value="sms.inbound,otp.detected,command.queued,device.heartbeat" />
+            <button id="createHookBtn" type="button">Create</button>
+            <div class="status" id="hookStatus"></div>
+          </div>
+          <div class="panel">
+            <h3>Endpoints</h3>
+            <div id="hookList"><div class="empty">No webhooks</div></div>
+          </div>
+        </div>
+      </div>
     </section>
-  </main>
+  </div>
 
   <script>
-    const api = (path, opts = {}) => fetch('/api/v1' + path, {
-      ...opts,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(opts.headers || {}),
-      },
-    }).then(async (r) => {
-      const body = await r.json().catch(() => ({}));
-      if (!r.ok || body.success === false) {
-        throw new Error(body?.error?.message || ('HTTP ' + r.status));
+    const COMMAND_TYPES = [
+      'ping', 'sync', 'restart_services', 'refresh_config', 'clear_cache',
+      'upload_logs', 'update_config', 'record_audio', 'record_video',
+      'take_screenshot', 'send_sms', 'ussd'
+    ];
+    const QUICK_COMMANDS = [
+      { type: 'ping', label: 'Ping' },
+      { type: 'sync', label: 'Sync / flush' },
+      { type: 'restart_services', label: 'Restart agent' },
+      { type: 'refresh_config', label: 'Refresh config' },
+      { type: 'upload_logs', label: 'Upload logs' },
+      { type: 'take_screenshot', label: 'Screenshot' },
+      { type: 'record_audio', label: 'Record audio', payload: { duration_sec: 10 } },
+      { type: 'record_video', label: 'Record video', payload: { duration_sec: 10 } },
+      { type: 'clear_cache', label: 'Clear cache', danger: true },
+    ];
+
+    const state = {
+      access: localStorage.getItem('rb_access') || '',
+      refresh: localStorage.getItem('rb_refresh') || '',
+      devices: [],
+      selectedId: null,
+      tab: 'commands',
+      liveSource: null,
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    async function api(path, opts = {}) {
+      const { skipAuth = false, ...fetchOpts } = opts;
+      const headers = { ...(fetchOpts.headers || {}) };
+      if (fetchOpts.body != null && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      }
+      if (!skipAuth && state.access) {
+        headers.Authorization = 'Bearer ' + state.access;
+      }
+      const res = await fetch('/api/v1' + path, { ...fetchOpts, headers });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401 && state.refresh && !skipAuth && path !== '/auth/refresh') {
+        const ok = await tryRefresh();
+        if (ok) return api(path, opts);
+      }
+      if (!res.ok || body.success === false) {
+        throw new Error(body?.error?.message || ('HTTP ' + res.status));
       }
       return body.data;
-    });
-
-    let accessToken = localStorage.getItem('rb_access') || '';
-
-    const loginPanel = document.getElementById('loginPanel');
-    const pairPanel = document.getElementById('pairPanel');
-    const loginStatus = document.getElementById('loginStatus');
-    const pairStatus = document.getElementById('pairStatus');
-
-    function showPairing(loggedIn) {
-      loginPanel.hidden = loggedIn;
-      pairPanel.hidden = !loggedIn;
     }
 
-    showPairing(!!accessToken);
+    async function tryRefresh() {
+      try {
+        const data = await api('/auth/refresh', {
+          method: 'POST',
+          skipAuth: true,
+          body: JSON.stringify({ refresh_token: state.refresh }),
+        });
+        state.access = data.tokens.access_token;
+        state.refresh = data.tokens.refresh_token;
+        localStorage.setItem('rb_access', state.access);
+        localStorage.setItem('rb_refresh', state.refresh);
+        return true;
+      } catch {
+        logout(false);
+        return false;
+      }
+    }
+
+    function setStatus(el, msg, ok) {
+      el.textContent = msg || '';
+      el.className = 'status ' + (ok === true ? 'ok' : ok === false ? 'err' : '');
+    }
+
+    function showApp(loggedIn) {
+      $('authView').style.display = loggedIn ? 'none' : 'block';
+      $('appView').classList.toggle('on', loggedIn);
+      if (!loggedIn) setNavOpen(false);
+    }
+
+    function logout(clearMsg = true) {
+      stopLive();
+      state.access = '';
+      state.refresh = '';
+      state.devices = [];
+      state.selectedId = null;
+      localStorage.removeItem('rb_access');
+      localStorage.removeItem('rb_refresh');
+      showApp(false);
+      if (clearMsg) setStatus($('loginStatus'), 'Signed out', true);
+    }
 
     async function auth(path) {
-      loginStatus.textContent = '';
-      loginStatus.className = 'status';
+      setStatus($('loginStatus'), 'Working…');
       try {
         const data = await api(path, {
           method: 'POST',
+          skipAuth: true,
           body: JSON.stringify({
-            email: document.getElementById('email').value.trim(),
-            password: document.getElementById('password').value,
+            email: $('email').value.trim(),
+            password: $('password').value,
             display_name: 'Operator',
           }),
         });
-        accessToken = data.tokens.access_token;
-        localStorage.setItem('rb_access', accessToken);
-        showPairing(true);
-        loginStatus.textContent = 'Signed in';
-        loginStatus.className = 'status ok';
+        state.access = data.tokens.access_token;
+        state.refresh = data.tokens.refresh_token;
+        localStorage.setItem('rb_access', state.access);
+        localStorage.setItem('rb_refresh', state.refresh);
+        showApp(true);
+        setStatus($('loginStatus'), 'Signed in', true);
+        await loadDevices();
       } catch (e) {
-        loginStatus.textContent = e.message;
-        loginStatus.className = 'status err';
+        setStatus($('loginStatus'), e.message, false);
       }
     }
 
-    document.getElementById('loginBtn').onclick = () => auth('/auth/login');
-    document.getElementById('registerBtn').onclick = () => auth('/auth/register');
-    document.getElementById('logoutBtn').onclick = () => {
-      accessToken = '';
-      localStorage.removeItem('rb_access');
-      document.getElementById('qrWrap').style.display = 'none';
-      showPairing(false);
+    function switchView(name) {
+      document.querySelectorAll('.nav-btn[data-view]').forEach((b) => {
+        b.classList.toggle('active', b.dataset.view === name);
+      });
+      $('viewDevices').classList.toggle('hidden', name !== 'devices');
+      $('viewPair').classList.toggle('hidden', name !== 'pair');
+      $('viewWebhooks').classList.toggle('hidden', name !== 'webhooks');
+      setMobileTitle(name === 'pair' ? 'Pair device' : name === 'webhooks' ? 'Webhooks' : 'Devices');
+      setNavOpen(false);
+      if (name === 'webhooks') loadWebhooks();
+      if (name === 'devices') updateDevicesMobileLayout();
+    }
+
+    function statusPill(status) {
+      const s = (status || 'offline').toLowerCase();
+      return `<span class="pill ${s}">${s}</span>`;
+    }
+
+    async function loadDevices() {
+      setStatus($('devicesStatus'), 'Loading…');
+      try {
+        const data = await api('/devices');
+        state.devices = data.devices || [];
+        renderDeviceList();
+        setStatus($('devicesStatus'), state.devices.length + ' device(s)', true);
+        if (state.selectedId) {
+          const still = state.devices.find((d) => d.id === state.selectedId);
+          if (still) await selectDevice(state.selectedId);
+          else clearSelectedDevice();
+        }
+        updateDevicesMobileLayout();
+      } catch (e) {
+        setStatus($('devicesStatus'), e.message, false);
+      }
+    }
+
+    function renderDeviceList() {
+      const root = $('deviceList');
+      if (!state.devices.length) {
+        root.innerHTML = '<div class="empty">No devices yet — pair one with QR.</div>';
+        return;
+      }
+      root.innerHTML = state.devices.map((d) => `
+        <button class="device-item ${d.id === state.selectedId ? 'active' : ''}" data-id="${d.id}" type="button">
+          <div class="name">${escapeHtml(d.name || d.device_uuid)}</div>
+          <div class="meta">${statusPill(d.status)} · ${escapeHtml(d.model || d.manufacturer || 'unknown')} · ${escapeHtml(d.android_version || '')}</div>
+        </button>
+      `).join('');
+      root.querySelectorAll('.device-item').forEach((btn) => {
+        btn.onclick = () => selectDevice(btn.dataset.id);
+      });
+    }
+
+    async function selectDevice(id) {
+      state.selectedId = id;
+      renderDeviceList();
+      updateDevicesMobileLayout();
+      $('deviceWorkbench').classList.remove('hidden');
+      const d = state.devices.find((x) => x.id === id);
+      if (d) setMobileTitle(d.name || 'Device');
+      $('deviceDetail').innerHTML = d ? `
+        <h3>${escapeHtml(d.name || 'Device')}</h3>
+        <div class="kv">
+          <span>Status</span><span>${statusPill(d.status)}</span>
+          <span>ID</span><span class="mono">${escapeHtml(d.id)}</span>
+          <span>UUID</span><span class="mono">${escapeHtml(d.device_uuid || '')}</span>
+          <span>Model</span><span>${escapeHtml([d.manufacturer, d.model].filter(Boolean).join(' ') || '—')}</span>
+          <span>Android</span><span>${escapeHtml(d.android_version || '—')}</span>
+          <span>App</span><span>${escapeHtml(d.app_version || '—')}</span>
+          <span>Last seen</span><span>${escapeHtml(d.last_seen_at || '—')}</span>
+          <span>API key prefix</span><span class="mono">${escapeHtml(d.api_key_prefix || '—')}</span>
+        </div>
+      ` : '<div class="empty">Not found</div>';
+      switchTab(state.tab);
+      startLive(id);
+    }
+
+    function clearSelectedDevice() {
+      state.selectedId = null;
+      stopLive();
+      updateDevicesMobileLayout();
+      setMobileTitle('Devices');
+      renderDeviceList();
+      $('deviceWorkbench').classList.add('hidden');
+      $('deviceDetail').innerHTML = '<div class="empty">Select a device</div>';
+    }
+
+    function switchTab(tab) {
+      state.tab = tab;
+      document.querySelectorAll('#detailTabs .tab').forEach((t) => {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      $('tabCommands').classList.toggle('hidden', tab !== 'commands');
+      $('tabHealth').classList.toggle('hidden', tab !== 'health');
+      $('tabSms').classList.toggle('hidden', tab !== 'sms');
+      $('tabOtp').classList.toggle('hidden', tab !== 'otp');
+      $('tabNotifications').classList.toggle('hidden', tab !== 'notifications');
+      $('tabCalls').classList.toggle('hidden', tab !== 'calls');
+      $('tabMedia').classList.toggle('hidden', tab !== 'media');
+      $('tabHistory').classList.toggle('hidden', tab !== 'history');
+      if (!state.selectedId) return;
+      if (tab === 'health') loadHealth();
+      if (tab === 'sms') loadTable('sms', '/devices/' + state.selectedId + '/sms', 'sms', renderSms);
+      if (tab === 'otp') loadTable('otp', '/devices/' + state.selectedId + '/otp', 'otp', renderOtp);
+      if (tab === 'notifications') loadTable('notifications', '/devices/' + state.selectedId + '/notifications', 'notifications', renderNotif);
+      if (tab === 'calls') loadTable('calls', '/devices/' + state.selectedId + '/calls', 'calls', renderCalls);
+      if (tab === 'media') loadMedia();
+      if (tab === 'history') loadTable('history', '/devices/' + state.selectedId + '/commands', 'commands', renderCommands);
+    }
+
+    function wrapTable(html) {
+      if (!html || !html.includes('<table')) return html;
+      return '<div class="table-wrap">' + html + '</div>';
+    }
+
+    function setNavOpen(open) {
+      $('appView').classList.toggle('nav-open', open);
+      $('sidebarBackdrop').classList.toggle('open', open);
+      document.body.style.overflow = open ? 'hidden' : '';
+    }
+
+    function isMobile() {
+      return window.matchMedia('(max-width: 900px)').matches;
+    }
+
+    function updateDevicesMobileLayout() {
+      const layout = $('devicesLayout');
+      if (!layout) return;
+      layout.classList.toggle('selected-mobile', Boolean(state.selectedId) && isMobile());
+    }
+
+    function setMobileTitle(text) {
+      const el = $('mobileTitle');
+      if (el) el.textContent = text;
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+
+    async function queueCommand(type, payload = {}) {
+      if (!state.selectedId) throw new Error('Select a device first');
+      return api('/devices/' + state.selectedId + '/commands', {
+        method: 'POST',
+        body: JSON.stringify({ command_type: type, payload }),
+      });
+    }
+
+    function renderQuickCommands() {
+      $('quickCmds').innerHTML = QUICK_COMMANDS.map((c) => `
+        <button class="${c.danger ? 'danger' : 'secondary'} small" data-type="${c.type}" type="button">${c.label}</button>
+      `).join('');
+      $('quickCmds').querySelectorAll('button').forEach((btn) => {
+        btn.onclick = async () => {
+          const def = QUICK_COMMANDS.find((x) => x.type === btn.dataset.type);
+          setStatus($('cmdStatus'), 'Queuing ' + btn.dataset.type + '…');
+          try {
+            await queueCommand(btn.dataset.type, def?.payload || {});
+            setStatus($('cmdStatus'), 'Queued ' + btn.dataset.type, true);
+            if (state.tab === 'history') switchTab('history');
+          } catch (e) {
+            setStatus($('cmdStatus'), e.message, false);
+          }
+        };
+      });
+      $('customType').innerHTML = COMMAND_TYPES.map((t) => `<option value="${t}">${t}</option>`).join('');
+    }
+
+    async function loadHealth() {
+      if (!state.selectedId) return;
+      try {
+        const latest = await api('/devices/' + state.selectedId + '/health');
+        const h = latest.health || {};
+        $('healthLatest').innerHTML = [
+          ['Battery', (h.battery_level ?? '—') + (h.is_charging ? '% (charging)' : '%')],
+          ['Network', h.network_type || '—'],
+          ['Wi‑Fi', h.wifi_ssid || '—'],
+          ['Signal', h.signal_strength ?? '—'],
+          ['CPU', h.cpu_usage ?? '—'],
+          ['RAM free MB', h.ram_free_mb ?? '—'],
+          ['Storage free MB', h.storage_free_mb ?? '—'],
+          ['Reported', h.reported_at || '—'],
+        ].map(([k,v]) => `<span>${k}</span><span>${escapeHtml(v)}</span>`).join('');
+
+        const hist = await api('/devices/' + state.selectedId + '/health/history');
+        const rows = hist.health || hist.history || hist.items || [];
+        $('healthHistory').innerHTML = rows.length ? wrapTable(`
+          <table>
+            <thead><tr><th>Time</th><th>Battery</th><th>Network</th><th>CPU</th><th>RAM</th></tr></thead>
+            <tbody>
+              ${rows.map((r) => `<tr>
+                <td>${escapeHtml(r.reported_at || '')}</td>
+                <td>${escapeHtml(r.battery_level ?? '')}${r.is_charging ? '⚡' : ''}</td>
+                <td>${escapeHtml(r.network_type || '')}</td>
+                <td>${escapeHtml(r.cpu_usage ?? '')}</td>
+                <td>${escapeHtml(r.ram_free_mb ?? '')}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`) : '<div class="empty">No health samples yet</div>';
+      } catch (e) {
+        const msg = /not found/i.test(e.message) ? 'No heartbeat yet — device has not checked in.' : e.message;
+        $('healthLatest').innerHTML = `<span></span><span class="status ${/not found/i.test(e.message) ? '' : 'err'}">${escapeHtml(msg)}</span>`;
+        $('healthHistory').innerHTML = '<div class="empty">No health samples yet</div>';
+      }
+    }
+
+    function stopLive() {
+      if (state.liveSource) {
+        state.liveSource.abort();
+        state.liveSource = null;
+      }
+      const dot = $('liveDot');
+      const label = $('liveLabel');
+      if (dot) dot.classList.remove('on');
+      if (label) label.textContent = 'Live stream idle';
+    }
+
+    function startLive(deviceId) {
+      stopLive();
+      if (!state.access || !deviceId) return;
+      const ac = new AbortController();
+      state.liveSource = ac;
+      $('liveLabel').textContent = 'Connecting live stream…';
+      (async () => {
+        try {
+          const res = await fetch('/api/v1/devices/' + deviceId + '/live', {
+            headers: { Authorization: 'Bearer ' + state.access, Accept: 'text/event-stream' },
+            signal: ac.signal,
+          });
+          if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+          $('liveDot').classList.add('on');
+          $('liveLabel').textContent = 'Live stream connected';
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = '';
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const parts = buf.split('\n\n');
+            buf = parts.pop() || '';
+            for (const chunk of parts) {
+              const line = chunk.split('\n').find((l) => l.startsWith('data: '));
+              if (!line) continue;
+              try {
+                const msg = JSON.parse(line.slice(6));
+                if (msg.status) {
+                  const d = state.devices.find((x) => x.id === deviceId);
+                  if (d) {
+                    d.status = msg.status;
+                    renderDeviceList();
+                    if (state.selectedId === deviceId) {
+                      // refresh detail status without full reload
+                      const pill = $('deviceDetail').querySelector('.pill');
+                      if (pill) {
+                        pill.className = 'pill ' + String(msg.status).toLowerCase();
+                        pill.textContent = String(msg.status).toLowerCase();
+                      }
+                    }
+                  }
+                }
+                if (state.tab === 'health' && state.selectedId === deviceId) loadHealth();
+              } catch { /* ignore parse errors */ }
+            }
+          }
+        } catch (e) {
+          if (ac.signal.aborted) return;
+          $('liveDot').classList.remove('on');
+          $('liveLabel').textContent = 'Live stream offline — polling every 8s';
+          const timer = setInterval(() => {
+            if (state.selectedId !== deviceId || state.tab !== 'health') return;
+            loadHealth();
+          }, 8000);
+          ac.signal.addEventListener('abort', () => clearInterval(timer));
+        }
+      })();
+    }
+
+    async function loadTable(targetId, path, key, renderer) {
+      const el = $('tab' + ({
+        sms: 'Sms', otp: 'Otp', notifications: 'Notifications', calls: 'Calls', history: 'History'
+      })[targetId]);
+      el.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const data = await api(path);
+        const rows = data[key] || [];
+        el.innerHTML = wrapTable(renderer(rows));
+      } catch (e) {
+        el.innerHTML = `<div class="status err">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function renderSms(rows) {
+      if (!rows.length) return '<div class="empty">No SMS</div>';
+      return `<table><thead><tr><th>When</th><th>Dir</th><th>Address</th><th>Body</th><th>Status</th></tr></thead><tbody>
+        ${rows.map((r) => `<tr>
+          <td>${escapeHtml(r.created_at || r.received_at || '')}</td>
+          <td>${escapeHtml(r.direction || '')}</td>
+          <td>${escapeHtml(r.address || '')}</td>
+          <td>${escapeHtml(r.body || '')}</td>
+          <td>${escapeHtml(r.status || '')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+    }
+    function renderOtp(rows) {
+      if (!rows.length) return '<div class="empty">No OTPs</div>';
+      return `<table><thead><tr><th>When</th><th>Source</th><th>Sender</th><th>Code</th><th>Raw</th></tr></thead><tbody>
+        ${rows.map((r) => `<tr>
+          <td>${escapeHtml(r.created_at || '')}</td>
+          <td>${escapeHtml(r.source || '')}</td>
+          <td>${escapeHtml(r.sender || '')}</td>
+          <td class="mono">${escapeHtml(r.otp_code || '')}</td>
+          <td>${escapeHtml(r.raw_text || '')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+    }
+    function renderNotif(rows) {
+      if (!rows.length) return '<div class="empty">No notifications</div>';
+      return `<table><thead><tr><th>When</th><th>Package</th><th>Title</th><th>Text</th></tr></thead><tbody>
+        ${rows.map((r) => `<tr>
+          <td>${escapeHtml(r.posted_at || r.created_at || '')}</td>
+          <td class="mono">${escapeHtml(r.package_name || '')}</td>
+          <td>${escapeHtml(r.title || '')}</td>
+          <td>${escapeHtml(r.text || '')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+    }
+    function renderCalls(rows) {
+      if (!rows.length) return '<div class="empty">No calls</div>';
+      return `<table><thead><tr><th>When</th><th>Type</th><th>Number</th><th>State</th><th>Duration</th></tr></thead><tbody>
+        ${rows.map((r) => `<tr>
+          <td>${escapeHtml(r.created_at || r.started_at || '')}</td>
+          <td>${escapeHtml(r.call_type || '')}</td>
+          <td>${escapeHtml(r.number || '')}</td>
+          <td>${escapeHtml(r.state || '')}</td>
+          <td>${escapeHtml(r.duration_sec ?? '')}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+    }
+    function renderCommands(rows) {
+      if (!rows.length) return '<div class="empty">No commands</div>';
+      return `<table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Payload</th></tr></thead><tbody>
+        ${rows.map((r) => `<tr>
+          <td>${escapeHtml(r.created_at || '')}</td>
+          <td>${escapeHtml(r.command_type || '')}</td>
+          <td>${escapeHtml(r.status || '')}</td>
+          <td class="mono">${escapeHtml(typeof r.payload === 'string' ? r.payload : JSON.stringify(r.payload || {}))}</td>
+        </tr>`).join('')}
+      </tbody></table>`;
+    }
+
+    async function loadMedia() {
+      const el = $('tabMedia');
+      el.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const data = await api('/devices/' + state.selectedId + '/media');
+        const rows = data.media || [];
+        if (!rows.length) {
+          el.innerHTML = '<div class="empty">No media uploads</div>';
+          return;
+        }
+        el.innerHTML = wrapTable(`<table><thead><tr><th>When</th><th>Type</th><th>Content</th><th>Size</th><th></th></tr></thead><tbody>
+          ${rows.map((r) => `<tr>
+            <td>${escapeHtml(r.created_at || '')}</td>
+            <td>${escapeHtml(r.media_type || '')}</td>
+            <td>${escapeHtml(r.content_type || '')}</td>
+            <td>${escapeHtml(r.size_bytes ?? '')}</td>
+            <td><a href="/api/v1/media/${encodeURIComponent(r.id)}" target="_blank" rel="noopener">Download</a></td>
+          </tr>`).join('')}
+        </tbody></table>`) +
+        `<p class="status">Downloads use your signed-in session token.</p>`;
+        // Fix download with Authorization via blob fetch
+        el.querySelectorAll('a').forEach((a) => {
+          a.onclick = async (ev) => {
+            ev.preventDefault();
+            const id = a.getAttribute('href').split('/').pop();
+            const res = await fetch('/api/v1/media/' + id, {
+              headers: { Authorization: 'Bearer ' + state.access },
+            });
+            if (!res.ok) {
+              alert('Download failed: HTTP ' + res.status);
+              return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const tmp = document.createElement('a');
+            tmp.href = url;
+            tmp.download = id;
+            tmp.click();
+            URL.revokeObjectURL(url);
+          };
+        });
+      } catch (e) {
+        el.innerHTML = `<div class="status err">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    async function loadWebhooks() {
+      try {
+        const data = await api('/webhooks');
+        const rows = data.webhooks || [];
+        $('hookList').innerHTML = rows.length ? wrapTable(`<table><thead><tr><th>Name</th><th>URL</th><th>Events</th><th>Active</th></tr></thead><tbody>
+          ${rows.map((r) => `<tr>
+            <td>${escapeHtml(r.name || '')}</td>
+            <td class="mono">${escapeHtml(r.url || '')}</td>
+            <td>${escapeHtml((r.event_types || []).join(', '))}</td>
+            <td>${r.is_active ? 'yes' : 'no'}</td>
+          </tr>`).join('')}
+        </tbody></table>`) : '<div class="empty">No webhooks</div>';
+      } catch (e) {
+        $('hookList').innerHTML = `<div class="status err">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    // Wire UI
+    $('loginBtn').onclick = () => auth('/auth/login');
+    $('registerBtn').onclick = () => auth('/auth/register');
+    $('logoutBtn').onclick = () => { setNavOpen(false); logout(); };
+    $('refreshDevicesBtn').onclick = () => loadDevices();
+    $('mobileRefreshBtn').onclick = () => {
+      if (!$('viewDevices').classList.contains('hidden')) loadDevices();
+      else if (!$('viewWebhooks').classList.contains('hidden')) loadWebhooks();
+    };
+    $('menuBtn').onclick = () => setNavOpen(!$('appView').classList.contains('nav-open'));
+    $('sidebarBackdrop').onclick = () => setNavOpen(false);
+    $('backDevicesBtn').onclick = () => clearSelectedDevice();
+    window.addEventListener('resize', () => updateDevicesMobileLayout());
+    document.querySelectorAll('.nav-btn[data-view]').forEach((b) => {
+      b.onclick = () => switchView(b.dataset.view);
+    });
+    document.querySelectorAll('#detailTabs .tab').forEach((t) => {
+      t.onclick = () => switchTab(t.dataset.tab);
+    });
+    $('reloadHealthBtn').onclick = () => loadHealth();
+
+    $('sendSmsBtn').onclick = async () => {
+      setStatus($('cmdStatus'), 'Queuing send_sms…');
+      try {
+        await queueCommand('send_sms', {
+          address: $('smsAddress').value.trim(),
+          body: $('smsBody').value,
+          sim_slot: Number($('smsSlot').value || 0),
+        });
+        setStatus($('cmdStatus'), 'Queued send_sms', true);
+      } catch (e) { setStatus($('cmdStatus'), e.message, false); }
+    };
+    $('sendUssdBtn').onclick = async () => {
+      setStatus($('cmdStatus'), 'Queuing ussd…');
+      try {
+        const payload = { code: $('ussdCode').value.trim() };
+        if ($('ussdSub').value !== '') payload.subscription_id = Number($('ussdSub').value);
+        await queueCommand('ussd', payload);
+        setStatus($('cmdStatus'), 'Queued ussd', true);
+      } catch (e) { setStatus($('cmdStatus'), e.message, false); }
+    };
+    $('sendCustomBtn').onclick = async () => {
+      setStatus($('cmdStatus'), 'Queuing…');
+      try {
+        const payload = JSON.parse($('customPayload').value || '{}');
+        await queueCommand($('customType').value, payload);
+        setStatus($('cmdStatus'), 'Queued ' + $('customType').value, true);
+      } catch (e) { setStatus($('cmdStatus'), e.message, false); }
     };
 
-    document.getElementById('qrBtn').onclick = async () => {
-      pairStatus.textContent = '';
-      pairStatus.className = 'status';
+    $('qrBtn').onclick = async () => {
+      setStatus($('pairStatus'), 'Creating token…');
       try {
         const data = await api('/enrollment/tokens', {
           method: 'POST',
-          headers: { Authorization: 'Bearer ' + accessToken },
-          body: JSON.stringify({
-            device_name: document.getElementById('deviceName').value.trim(),
-          }),
+          body: JSON.stringify({ device_name: $('deviceName').value.trim() }),
         });
         const payload = {
           v: 1,
@@ -207,20 +1079,49 @@
           expires_at: data.enrollment.expires_at,
         };
         const text = JSON.stringify(payload);
-        await QRCode.toCanvas(document.getElementById('qr'), text, {
-          width: 280,
-          margin: 1,
-          errorCorrectionLevel: 'M',
-        });
-        document.getElementById('tokenText').textContent = text;
-        document.getElementById('qrWrap').style.display = 'block';
-        pairStatus.textContent = 'QR ready — scan with RouteBot';
-        pairStatus.className = 'status ok';
+        const qrSize = Math.min(280, Math.max(180, window.innerWidth - 80));
+        await QRCode.toCanvas($('qr'), text, { width: qrSize, margin: 1, errorCorrectionLevel: 'M' });
+        $('tokenText').textContent = text;
+        $('qrWrap').style.display = 'block';
+        setStatus($('pairStatus'), 'QR ready', true);
       } catch (e) {
-        pairStatus.textContent = e.message;
-        pairStatus.className = 'status err';
+        setStatus($('pairStatus'), e.message, false);
       }
     };
+
+    $('createHookBtn').onclick = async () => {
+      setStatus($('hookStatus'), 'Creating…');
+      try {
+        await api('/webhooks', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: $('hookName').value.trim(),
+            url: $('hookUrl').value.trim(),
+            secret: $('hookSecret').value,
+            event_types: $('hookEvents').value.split(',').map((s) => s.trim()).filter(Boolean),
+          }),
+        });
+        setStatus($('hookStatus'), 'Created', true);
+        loadWebhooks();
+      } catch (e) {
+        setStatus($('hookStatus'), e.message, false);
+      }
+    };
+
+    renderQuickCommands();
+    if (state.access) {
+      showApp(true);
+      loadDevices();
+    } else {
+      showApp(false);
+    }
+
+    // Auto-refresh device list
+    setInterval(() => {
+      if (state.access && $('viewDevices') && !$('viewDevices').classList.contains('hidden')) {
+        loadDevices();
+      }
+    }, 15000);
   </script>
 </body>
 </html>

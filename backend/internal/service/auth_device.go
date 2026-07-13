@@ -91,6 +91,41 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput, ip string) (*dom
 	return user, pair, nil
 }
 
+// EnsureBootstrapAdmin creates or updates an admin user from environment bootstrap
+// credentials (ADMIN_EMAIL / ADMIN_PASSWORD). No-op when email or password is empty.
+func (s *AuthService) EnsureBootstrapAdmin(ctx context.Context, email, password, displayName string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	password = strings.TrimSpace(password)
+	if email == "" || password == "" {
+		return nil
+	}
+	if len(password) < 8 {
+		return fmt.Errorf("ADMIN_PASSWORD must be at least 8 characters")
+	}
+	if strings.TrimSpace(displayName) == "" {
+		displayName = "Admin"
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	user := &domain.User{
+		Email:        email,
+		PasswordHash: hash,
+		DisplayName:  strings.TrimSpace(displayName),
+		Role:         domain.RoleAdmin,
+		IsActive:     true,
+	}
+	if err := s.users.UpsertByEmail(ctx, user); err != nil {
+		return err
+	}
+	_ = s.audit.Insert(ctx, &domain.AuditLog{
+		ActorType: "system", ActorID: "bootstrap", Action: "auth.bootstrap_admin",
+		ResourceType: "user", ResourceID: user.ID.String(),
+	})
+	return nil
+}
+
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*auth.TokenPair, error) {
 	hash := auth.HashToken(refreshToken)
 	userID, err := s.refresh.GetValid(ctx, hash)
@@ -298,7 +333,14 @@ func (s *DeviceService) LatestHealth(ctx context.Context, ownerID, deviceID uuid
 	if _, err := s.Get(ctx, ownerID, deviceID); err != nil {
 		return nil, err
 	}
-	return s.hb.LatestByDevice(ctx, deviceID)
+	hb, err := s.hb.LatestByDevice(ctx, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	if hb == nil {
+		return nil, ErrNotFound
+	}
+	return hb, nil
 }
 
 // HealthHistory returns recent heartbeat samples so the dashboard can render

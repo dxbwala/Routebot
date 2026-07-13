@@ -13,6 +13,17 @@ Copy [`.env.example`](../.env.example) to `.env` and generate real secrets — n
 
 ```bash
 cp .env.example .env
+```
+
+Set a dashboard admin (created/updated automatically when the API starts):
+
+```bash
+ADMIN_EMAIL=admin@routedns.io
+ADMIN_PASSWORD=ChangeMeAdmin123!
+ADMIN_DISPLAY_NAME=Admin
+```
+
+Then rotate the other secrets (`JWT_SECRET`, peppers, DB/Redis passwords, etc.).
 sed -i '' "s#^JWT_SECRET=.*#JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')#" .env
 sed -i '' "s#^DEVICE_API_KEY_PEPPER=.*#DEVICE_API_KEY_PEPPER=$(openssl rand -hex 32)#" .env
 sed -i '' "s#^WEBHOOK_HMAC_SECRET=.*#WEBHOOK_HMAC_SECRET=$(openssl rand -hex 32)#" .env
