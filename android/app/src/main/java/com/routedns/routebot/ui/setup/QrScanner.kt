@@ -7,14 +7,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,10 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.NotFoundException
+import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.common.HybridBinarizer
+import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -68,6 +69,18 @@ fun QrScanner(
 
     val handled = remember { AtomicBoolean(false) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    val reader = remember {
+        MultiFormatReader().apply {
+            setHints(
+                mapOf(
+                    com.google.zxing.DecodeHintType.POSSIBLE_FORMATS to listOf(
+                        com.google.zxing.BarcodeFormat.QR_CODE
+                    ),
+                    com.google.zxing.DecodeHintType.TRY_HARDER to true
+                )
+            )
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose { cameraExecutor.shutdown() }
@@ -85,32 +98,21 @@ fun QrScanner(
                 val preview = Preview.Builder().build().also {
                     it.surfaceProvider = previewView.surfaceProvider
                 }
-                val options = BarcodeScannerOptions.Builder()
-                    .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                    .build()
-                val scanner = BarcodeScanning.getClient(options)
                 val analysis = ImageAnalysis.Builder()
                     .setTargetResolution(Size(1280, 720))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                     .build()
                 analysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                    val mediaImage = imageProxy.image
-                    if (mediaImage == null || handled.get()) {
-                        imageProxy.close()
-                        return@setAnalyzer
-                    }
-                    val image = InputImage.fromMediaImage(
-                        mediaImage,
-                        imageProxy.imageInfo.rotationDegrees
-                    )
-                    scanner.process(image)
-                        .addOnSuccessListener { barcodes ->
-                            val raw = barcodes.firstOrNull()?.rawValue
-                            if (!raw.isNullOrBlank() && handled.compareAndSet(false, true)) {
-                                onQrScanned(raw)
-                            }
+                    try {
+                        if (handled.get()) return@setAnalyzer
+                        val text = decodeQr(reader, imageProxy) ?: return@setAnalyzer
+                        if (handled.compareAndSet(false, true)) {
+                            onQrScanned(text)
                         }
-                        .addOnCompleteListener { imageProxy.close() }
+                    } finally {
+                        imageProxy.close()
+                    }
                 }
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
@@ -123,4 +125,32 @@ fun QrScanner(
             previewView
         }
     )
+}
+
+private fun decodeQr(reader: MultiFormatReader, imageProxy: ImageProxy): String? {
+    val plane = imageProxy.planes.firstOrNull() ?: return null
+    val buffer: ByteBuffer = plane.buffer
+    val data = ByteArray(buffer.remaining())
+    buffer.get(data)
+    val width = imageProxy.width
+    val height = imageProxy.height
+    val source = PlanarYUVLuminanceSource(
+        data,
+        width,
+        height,
+        0,
+        0,
+        width,
+        height,
+        false
+    )
+    return try {
+        reader.decodeWithState(BinaryBitmap(HybridBinarizer(source))).text
+    } catch (_: NotFoundException) {
+        null
+    } catch (_: Exception) {
+        null
+    } finally {
+        reader.reset()
+    }
 }

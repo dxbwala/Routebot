@@ -35,11 +35,27 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Assemble debug + minified release APK
+        run: ./gradlew :app:assembleDebug :app:assembleRelease --stacktrace
 
-      - name: Upload APK
+      - name: Report APK sizes
+        run: |
+          echo "## APK sizes" >> "$GITHUB_STEP_SUMMARY"
+          for f in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk; do
+            [ -f "$f" ] || continue
+            size=$(du -h "$f" | cut -f1)
+            bytes=$(wc -c < "$f" | tr -d ' ')
+            echo "- \`$(basename "$f")\`: **$size** ($bytes bytes)" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: routebot-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload release APK (unsigned if no keystore secrets)
+        uses: actions/upload-artifact@v4
+        with:
+          name: routebot-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
