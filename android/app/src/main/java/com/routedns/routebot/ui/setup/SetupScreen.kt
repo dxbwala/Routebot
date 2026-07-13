@@ -71,7 +71,7 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
 
-private const val DEFAULT_SERVER_URL = "http://192.168.0.236"
+private const val DEFAULT_SERVER_URL = "https://gateway.routedns.io"
 
 enum class SetupPane { CREDENTIALS, QR, API_KEY }
 

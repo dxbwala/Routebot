@@ -38,7 +38,6 @@ Routebot/
 Notable Android additions beyond the original scaffold:
 
 - `app/src/main/java/.../crash/CrashReporter.kt` — uncaught exception handler + pending-crash upload
-- `app/src/main/java/.../media/MediaProjectionHolder.kt`, `ui/screenshare/ScreenCaptureConsentActivity.kt` — screenshot consent flow
 - `app/src/debug/res/xml/network_security_config.xml` — debug-only cleartext override (release stays HTTPS-only)
 - `data/src/main/java/.../data/security/DbPassphraseProvider.kt` — SQLCipher passphrase, Keystore-backed
 - `data/src/test/` — offline-queue concurrency regression test

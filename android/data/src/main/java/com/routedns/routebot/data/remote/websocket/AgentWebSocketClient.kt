@@ -82,7 +82,8 @@ class AgentWebSocketClient @Inject constructor(
     private suspend fun connectLoop(serverUrl: String, apiKey: String) {
         val base = serverUrl.trimEnd('/')
         val wsUrl = base.replace("https://", "wss://").replace("http://", "ws://")
-        val requestUrl = "$wsUrl/ws/agent?api_key=$apiKey"
+        val encodedKey = java.net.URLEncoder.encode(apiKey, Charsets.UTF_8.name())
+        val requestUrl = "$wsUrl/ws/agent?api_key=$encodedKey"
 
         while (scope.isActive) {
             _state.value = if (backoffMs.get() > Constants.WS_INITIAL_BACKOFF_MS) {
@@ -120,7 +121,11 @@ class AgentWebSocketClient @Inject constructor(
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                    RouteBotLog.w("ws_failure", throwable = t)
+                    RouteBotLog.w(
+                        "ws_failure",
+                        mapOf("code" to (response?.code ?: -1), "message" to (t.message ?: "")),
+                        t
+                    )
                     pingJob?.cancel()
                     _state.value = ConnectionState.DISCONNECTED
                     latch.complete(false)
@@ -169,6 +174,12 @@ class AgentWebSocketClient @Inject constructor(
                     _commands.tryEmit(RemoteCommand(id, command, payload))
                 }
                 "pong", "heartbeat_ack", "welcome" -> Unit
+                "error" -> {
+                    val message = obj["message"]?.jsonPrimitive?.content ?: "unknown"
+                    RouteBotLog.w("ws_server_error", mapOf("message" to message))
+                    // Force reconnect path; auth errors need a new enrollment.
+                    webSocket?.close(1008, message)
+                }
                 else -> RouteBotLog.d("ws_message", mapOf("type" to obj["type"]))
             }
         }.onFailure {

@@ -112,14 +112,17 @@ fun DashboardScreen(viewModel: DashboardViewModel, onSettings: () -> Unit) {
     val permissions = listOf(
         Manifest.permission.RECEIVE_SMS to "SMS Receive",
         Manifest.permission.SEND_SMS to "SMS Send",
+        Manifest.permission.CALL_PHONE to "Call Phone (USSD)",
         Manifest.permission.READ_PHONE_STATE to "Phone State",
         Manifest.permission.POST_NOTIFICATIONS to "Notifications",
-        Manifest.permission.RECORD_AUDIO to "Audio",
         Manifest.permission.CAMERA to "Camera"
     ).map { (perm, label) ->
         PermissionStatus(label, ContextCompat.checkSelfPermission(context, perm) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED)
     }
+    val ussdA11yEnabled = com.routedns.routebot.ussd.UssdAccessibilityService.isEnabledInSettings(context) ||
+        com.routedns.routebot.ussd.UssdAccessibilityService.isConnected()
+
 
     Scaffold(
         topBar = {
@@ -170,6 +173,19 @@ fun DashboardScreen(viewModel: DashboardViewModel, onSettings: () -> Unit) {
                             context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         }
                     ) { Text("Open Notification Access") }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("USSD Accessibility")
+                        Text(if (ussdA11yEnabled) "✓" else "✗")
+                    }
+                    Text(
+                        "Required on Oppo/ColorOS and many OEMs where Telephony USSD callbacks fail",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }
+                    ) { Text("Open Accessibility Settings") }
                 }
             }
         }

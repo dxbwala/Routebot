@@ -36,8 +36,8 @@ Dashboard requests: `Authorization: Bearer <access_token>`.
 | GET | `/devices/:id/calls` | Call history |
 | POST | `/devices/:id/commands` | Queue command `{ command_type, payload }` |
 | GET | `/devices/:id/commands` | Command queue/history |
-| GET | `/devices/:id/media` | Media metadata |
-| GET | `/media/:id` | Download media bytes |
+| GET | `/devices/:id/media` | Log-upload metadata |
+| GET | `/media/:id` | Download uploaded log file |
 | POST | `/webhooks` | Create webhook endpoint |
 | GET | `/webhooks` | List webhook endpoints |
 
@@ -57,7 +57,7 @@ Dashboard requests: `Authorization: Bearer <access_token>`.
 
 ### Command types
 
-`ping`, `sync`, `restart_services`, `refresh_config`, `clear_cache`, `upload_logs`, `update_config`, `record_audio`, `record_video`, `take_screenshot`, `send_sms`, `ussd`
+`ping`, `sync`, `restart_services`, `refresh_config`, `clear_cache`, `upload_logs`, `update_config`, `send_sms`, `ussd`
 
 ## Agent (device API key + request signing)
 
@@ -86,7 +86,7 @@ receive `401 unauthorized`.
 | POST | `/agent/notifications` | Ingest notification |
 | POST | `/agent/calls` | Ingest call event |
 | POST | `/agent/commands/:id/ack` | Ack/complete command |
-| POST | `/agent/media` | Multipart upload (`media_type`: `audio`\|`video`\|`screenshot`\|`logs`, `file`, optional `command_id`) |
+| POST | `/agent/media` | Multipart upload for agent logs only (`media_type`: `logs`, `file`, optional `command_id`) |
 
 ### Heartbeat body (partial)
 

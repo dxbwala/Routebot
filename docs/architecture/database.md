@@ -17,7 +17,7 @@ and are idempotent (safe to re-run).
 | `notification_events` | Notification gateway |
 | `call_events` | Call monitor |
 | `commands` | Remote command queue |
-| `media_uploads` | Audio/video/screenshot/logs metadata |
+| `media_uploads` | Agent log-upload metadata |
 | `webhook_endpoints` | Customer webhook config |
 | `webhook_deliveries` | Delivery attempts + idempotency |
 | `audit_logs` | Security/audit trail (includes device registration, commands, crashes) |

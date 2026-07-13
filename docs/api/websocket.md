@@ -63,4 +63,4 @@ sequenceDiagram
 - Auto-reconnect with exponential backoff
 - Treat missed pong / read deadline (~90s) as disconnect
 - Never drop commands: if WS down, REST will still queue; on reconnect, server flushes `queued` commands
-- Prefer REST for large payloads (media, SMS bodies); WS for control plane
+- Prefer REST for large payloads (log uploads, SMS bodies); WS for control plane

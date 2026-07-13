@@ -14,7 +14,6 @@ object Constants {
 
     const val AGENT_CHANNEL_ID = "routebot_agent"
     const val AGENT_NOTIFICATION_ID = 1001
-    const val SCREEN_CAPTURE_NOTIFICATION_ID = 1002
 
     const val HEADER_DEVICE_API_KEY = "X-Device-API-Key"
     const val HEADER_REQUEST_ID = "X-Request-ID"

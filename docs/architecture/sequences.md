@@ -37,23 +37,6 @@ sequenceDiagram
   API->>PG: sweep_stale_to_offline
 ```
 
-## Remote command + media
-
-```mermaid
-sequenceDiagram
-  participant Dash as Dashboard
-  participant API as RouteBot_API
-  participant Agent as Android_Agent
-  Dash->>API: POST_/devices/:id/commands_record_audio
-  API-->>Dash: queued
-  API->>Agent: WS_command
-  Agent->>Agent: record_encrypt_local
-  Agent->>API: POST_/agent/media
-  Agent->>API: POST_/agent/commands/:id/ack
-  Agent->>Agent: delete_local_file
-  Dash->>API: GET_/media/:id
-```
-
 ## Agent request signing and replay protection
 
 ```mermaid
@@ -73,28 +56,6 @@ sequenceDiagram
     API->>API: process_request
     API-->>Agent: 200_success
   end
-```
-
-## Remote screenshot consent
-
-```mermaid
-sequenceDiagram
-  participant Dash as Dashboard
-  participant API as RouteBot_API
-  participant Agent as Android_Agent
-  participant User as Device_User
-  Dash->>API: POST_commands_take_screenshot
-  API->>Agent: WS_command
-  alt no_projection_grant_yet
-    Agent->>User: high_priority_notification
-    User->>Agent: tap_notification
-    Agent->>User: system_consent_dialog
-    User->>Agent: allow
-  end
-  Agent->>Agent: capture_encrypt_local
-  Agent->>API: POST_agent_media
-  Agent->>API: POST_agent_commands_ack
-  Agent->>Agent: delete_local_file
 ```
 
 ## SMS delivery report

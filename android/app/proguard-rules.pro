@@ -14,6 +14,10 @@
 -keep class javax.inject.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
 
+# Keep Accessibility USSD capture service for OEM fallback.
+-keep class com.routedns.routebot.ussd.UssdAccessibilityService { *; }
+
+
 # Optional annotations referenced by Tink (security-crypto) / OkHttp / ZXing.
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**

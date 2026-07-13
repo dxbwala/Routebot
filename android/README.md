@@ -61,11 +61,8 @@ Optional pins can be configured in Settings (one `sha256/…` pin per line). Whe
 
 - No secrets in logs (`RouteBotLog` redacts sensitive field names)
 - HTTPS only (`network_security_config` disables cleartext)
-- Local media files are AES-GCM encrypted before upload, then deleted
 
 ## Known limitations
 
-- Screenshot capture requires a `MediaProjection` grant (not available headlessly from remote command alone)
-- Video recording from background may fail on Android 10+ without foreground camera service
-- CPU usage collection is not implemented (backend field optional)
+- CPU usage collection is best-effort / may be unavailable on some OEMs
 - `gradlew` script not included — generate with `gradle wrapper` or Android Studio

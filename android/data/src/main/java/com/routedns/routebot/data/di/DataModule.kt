@@ -46,6 +46,8 @@ object DataProvideModule {
         @ApplicationContext context: Context,
         passphraseProvider: DbPassphraseProvider
     ): RouteBotDatabase {
+        // sqlcipher-android ships JNI in libsqlcipher.so — must be loaded before Room opens.
+        System.loadLibrary("sqlcipher")
         val factory = net.zetetic.database.sqlcipher.SupportOpenHelperFactory(passphraseProvider.getOrCreate())
         return Room.databaseBuilder(context, RouteBotDatabase::class.java, "routebot.db")
             .openHelperFactory(factory)

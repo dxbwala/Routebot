@@ -6,4 +6,6 @@
     <string name="agent_notification_title">RouteBot Agent Active</string>
     <string name="agent_notification_text">Connected to RouteDNS</string>
     <string name="notification_listener_label">RouteBot Notification Listener</string>
+    <string name="ussd_accessibility_label">RouteBot USSD Capture</string>
+    <string name="ussd_accessibility_description">Captures USSD dialog text so RouteBot can return carrier responses when TelephonyManager callbacks are blocked by the OEM.</string>
 </resources>

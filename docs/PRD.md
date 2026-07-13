@@ -137,34 +137,6 @@ Requirements
 - Command queue
 - Health metrics
 
-14. Remote Audio/Voice recording 
-- Receive command from api/dashboard
-- send recording file
-- delete after send
-- entrypted local storage
-
-
-15.Remote Video Recording
-- Receive command from api/dashboard
-- entrypted local storage
-- send to server
-
-16. Remote Screenshot
-- Receive command from api/dashboard
-- send file to server
-- delete local storate etc
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

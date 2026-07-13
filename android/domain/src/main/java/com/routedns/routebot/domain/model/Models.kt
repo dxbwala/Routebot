@@ -190,9 +190,6 @@ data class CommandAckRequest(
 
 @Serializable
 enum class MediaType {
-    @SerialName("audio") AUDIO,
-    @SerialName("video") VIDEO,
-    @SerialName("screenshot") SCREENSHOT,
     @SerialName("logs") LOGS
 }
 
@@ -250,9 +247,6 @@ object CommandTypes {
     const val UPDATE_CONFIG = "update_config"
     const val SEND_SMS = "send_sms"
     const val USSD = "ussd"
-    const val RECORD_AUDIO = "record_audio"
-    const val RECORD_VIDEO = "record_video"
-    const val TAKE_SCREENSHOT = "take_screenshot"
     const val UPLOAD_LOGS = "upload_logs"
 }
 

@@ -2,7 +2,7 @@
 
 RouteBot is a hexagonal / clean-architecture system with two runtimes:
 
-1. **Backend API** (`backend/`) — dashboard JWT auth, device API keys, event ingestion, command queue, media storage, HMAC webhooks, WebSocket command delivery.
+1. **Backend API** (`backend/`) — dashboard JWT auth, device API keys, event ingestion, command queue, log upload storage, HMAC webhooks, WebSocket command delivery.
 2. **Android agent** (`android/`) — foreground service, offline queue, collectors/gateways, remote command execution.
 
 ```mermaid
