@@ -1,0 +1,18 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.ap_
+*.aab
+output.json
+
+# Release signing — never commit the real keystore or its credentials.
+*.jks
+*.keystore
+keystore.properties

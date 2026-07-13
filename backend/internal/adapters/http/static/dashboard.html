@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RouteBot Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --text: #e8eef4;
+      --muted: #8b9aab;
+      --accent: #3d9cfd;
+      --ok: #3ecf8e;
+      --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #1c3a5a 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #163028 0%, transparent 50%),
+        var(--bg);
+      color: var(--text);
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 20px 80px;
+    }
+    h1 {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-weight: 600;
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    .sub { color: var(--muted); margin-bottom: 32px; }
+    .panel {
+      background: color-mix(in srgb, var(--panel) 92%, white 8%);
+      border: 1px solid #2a3542;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0d1218;
+      color: var(--text);
+      margin-bottom: 14px;
+      font-size: 1rem;
+    }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 18px;
+      background: var(--accent);
+      color: #041018;
+      font-weight: 650;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    button.secondary { background: #2a3542; color: var(--text); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    #qrWrap {
+      display: none;
+      text-align: center;
+      padding: 12px 0 4px;
+    }
+    #qr {
+      display: inline-block;
+      padding: 16px;
+      background: #fff;
+      border-radius: 12px;
+    }
+    .hint { color: var(--muted); font-size: 0.92rem; margin-top: 14px; line-height: 1.45; }
+    .status { min-height: 1.4em; margin-top: 10px; font-size: 0.9rem; }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+    .token {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      word-break: break-all;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>RouteBot</h1>
+    <p class="sub">Show a QR code. Scan it with the RouteBot Android app to connect automatically.</p>
+
+    <section class="panel" id="loginPanel">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" placeholder="admin@example.com" />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+      <div class="row">
+        <button id="loginBtn" type="button">Sign in</button>
+        <button id="registerBtn" class="secondary" type="button">Create account</button>
+      </div>
+      <div class="status" id="loginStatus"></div>
+    </section>
+
+    <section class="panel" id="pairPanel" hidden>
+      <label for="deviceName">Device name (optional)</label>
+      <input id="deviceName" type="text" placeholder="Warehouse phone 1" />
+      <div class="row">
+        <button id="qrBtn" type="button">Generate QR</button>
+        <button id="logoutBtn" class="secondary" type="button">Sign out</button>
+      </div>
+      <div id="qrWrap">
+        <canvas id="qr"></canvas>
+        <p class="hint">Open RouteBot → <strong>Scan QR</strong> and point the camera here.<br/>Code expires in 10 minutes and can be used once.</p>
+        <div class="token" id="tokenText"></div>
+      </div>
+      <div class="status" id="pairStatus"></div>
+    </section>
+  </main>
+
+  <script>
+    const api = (path, opts = {}) => fetch('/api/v1' + path, {
+      ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(opts.headers || {}),
+      },
+    }).then(async (r) => {
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok || body.success === false) {
+        throw new Error(body?.error?.message || ('HTTP ' + r.status));
+      }
+      return body.data;
+    });
+
+    let accessToken = localStorage.getItem('rb_access') || '';
+
+    const loginPanel = document.getElementById('loginPanel');
+    const pairPanel = document.getElementById('pairPanel');
+    const loginStatus = document.getElementById('loginStatus');
+    const pairStatus = document.getElementById('pairStatus');
+
+    function showPairing(loggedIn) {
+      loginPanel.hidden = loggedIn;
+      pairPanel.hidden = !loggedIn;
+    }
+
+    showPairing(!!accessToken);
+
+    async function auth(path) {
+      loginStatus.textContent = '';
+      loginStatus.className = 'status';
+      try {
+        const data = await api(path, {
+          method: 'POST',
+          body: JSON.stringify({
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+            display_name: 'Operator',
+          }),
+        });
+        accessToken = data.tokens.access_token;
+        localStorage.setItem('rb_access', accessToken);
+        showPairing(true);
+        loginStatus.textContent = 'Signed in';
+        loginStatus.className = 'status ok';
+      } catch (e) {
+        loginStatus.textContent = e.message;
+        loginStatus.className = 'status err';
+      }
+    }
+
+    document.getElementById('loginBtn').onclick = () => auth('/auth/login');
+    document.getElementById('registerBtn').onclick = () => auth('/auth/register');
+    document.getElementById('logoutBtn').onclick = () => {
+      accessToken = '';
+      localStorage.removeItem('rb_access');
+      document.getElementById('qrWrap').style.display = 'none';
+      showPairing(false);
+    };
+
+    document.getElementById('qrBtn').onclick = async () => {
+      pairStatus.textContent = '';
+      pairStatus.className = 'status';
+      try {
+        const data = await api('/enrollment/tokens', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + accessToken },
+          body: JSON.stringify({
+            device_name: document.getElementById('deviceName').value.trim(),
+          }),
+        });
+        const payload = {
+          v: 1,
+          server_url: window.location.origin,
+          token: data.enrollment.token,
+          expires_at: data.enrollment.expires_at,
+        };
+        const text = JSON.stringify(payload);
+        await QRCode.toCanvas(document.getElementById('qr'), text, {
+          width: 280,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+        });
+        document.getElementById('tokenText').textContent = text;
+        document.getElementById('qrWrap').style.display = 'block';
+        pairStatus.textContent = 'QR ready — scan with RouteBot';
+        pairStatus.className = 'status ok';
+      } catch (e) {
+        pairStatus.textContent = e.message;
+        pairStatus.className = 'status err';
+      }
+    };
+  </script>
+</body>
+</html>

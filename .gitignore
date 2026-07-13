@@ -1,0 +1,41 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+/certs/
+
+# Go
+backend/bin/
+backend/coverage.out
+backend/coverage.html
+*.exe
+*.test
+
+# Android
+android/.gradle/
+android/**/build/
+android/local.properties
+android/**/*.iml
+android/.idea/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+*.log
+
+# Storage
+storage/media/**
+!storage/media/.gitkeep
+
+# Docker volumes
+pgdata/
+redisdata/
