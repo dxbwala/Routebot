@@ -17,7 +17,6 @@ import com.routedns.routebot.common.RouteBotLog
 import com.routedns.routebot.core.monitor.DeviceMonitor
 import com.routedns.routebot.data.remote.OkHttpClientFactory
 import com.routedns.routebot.data.remote.websocket.AgentWebSocketClient
-import com.routedns.routebot.data.repository.AgentApiRepositoryImpl
 import com.routedns.routebot.domain.model.DeviceHeartbeat
 import com.routedns.routebot.domain.repository.AgentApiRepository
 import com.routedns.routebot.domain.repository.SecureStorageRepository
@@ -40,7 +39,6 @@ class AgentForegroundService : Service() {
 
     @Inject lateinit var secureStorage: SecureStorageRepository
     @Inject lateinit var agentApi: AgentApiRepository
-    @Inject lateinit var agentApiImpl: AgentApiRepositoryImpl
     @Inject lateinit var webSocketClient: AgentWebSocketClient
     @Inject lateinit var okHttpFactory: OkHttpClientFactory
     @Inject lateinit var deviceMonitor: DeviceMonitor
@@ -82,7 +80,7 @@ class AgentForegroundService : Service() {
         webSocketClient.connect(serverUrl, apiKey, client)
 
         webSocketClient.connected.onEach {
-            agentApiImpl.flushQueue()
+            agentApi.flushQueue()
         }.launchIn(scope)
 
         heartbeatJob?.cancel()

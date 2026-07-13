@@ -52,6 +52,36 @@ class RegisterWithApiKeyUseCase @Inject constructor(
     }
 }
 
+class ClaimEnrollmentUseCase @Inject constructor(
+    private val authRepository: AuthRepository,
+    private val secureStorage: SecureStorageRepository
+) {
+    suspend operator fun invoke(
+        serverUrl: String,
+        token: String,
+        request: DeviceRegistrationRequest
+    ): Result<DeviceRegistrationResponse> {
+        val claim = com.routedns.routebot.domain.model.EnrollmentClaimRequest(
+            token = token,
+            deviceUuid = request.deviceUuid,
+            name = request.name,
+            manufacturer = request.manufacturer,
+            model = request.model,
+            androidVersion = request.androidVersion,
+            appVersion = request.appVersion
+        )
+        val result = authRepository.claimEnrollment(serverUrl, claim)
+        result.onSuccess { response ->
+            secureStorage.saveApiKey(response.apiKey)
+            secureStorage.saveDeviceId(response.device.id)
+            secureStorage.saveDeviceUuid(response.device.deviceUuid)
+            secureStorage.saveDeviceName(response.device.name)
+            secureStorage.saveServerUrl(serverUrl.trim().trimEnd('/'))
+        }
+        return result
+    }
+}
+
 class ExtractOtpUseCase @Inject constructor(
     private val secureStorage: SecureStorageRepository
 ) {

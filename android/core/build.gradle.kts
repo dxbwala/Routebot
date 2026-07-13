@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.routedns.routebot.core"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         minSdk = 26

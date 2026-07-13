@@ -67,6 +67,7 @@ func main() {
 	auditRepo := postgres.NewAuditRepo(pool)
 
 	presence := redisadapter.NewPresence(rdb)
+	enrollStore := redisadapter.NewEnrollmentStore(rdb)
 	hub := ws.NewHub()
 	dispatcher := webhook.NewDispatcher(webhookRepo, log)
 	tokens := auth.NewManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
@@ -77,19 +78,21 @@ func main() {
 	cmdSvc := service.NewCommandService(cmdRepo, deviceRepo, hub, auditRepo, dispatcher)
 	mediaSvc := service.NewMediaService(mediaRepo, deviceRepo, cfg.MediaStoragePath)
 	webhookSvc := service.NewWebhookService(webhookRepo)
+	enrollSvc := service.NewEnrollmentService(enrollStore, deviceSvc, auditRepo)
 
 	wsHandler := ws.NewHandler(deviceSvc, cmdSvc, hub, log)
 
 	app := httpapi.NewRouter(httpapi.Deps{
-		Config:   cfg,
-		Tokens:   tokens,
-		Auth:     authSvc,
-		Devices:  deviceSvc,
-		Events:   eventSvc,
-		Commands: cmdSvc,
-		Media:    mediaSvc,
-		Webhooks: webhookSvc,
-		WS:       wsHandler.Endpoint(),
+		Config:     cfg,
+		Tokens:     tokens,
+		Auth:       authSvc,
+		Devices:    deviceSvc,
+		Events:     eventSvc,
+		Commands:   cmdSvc,
+		Media:      mediaSvc,
+		Webhooks:   webhookSvc,
+		Enrollment: enrollSvc,
+		WS:         wsHandler.Endpoint(),
 	})
 
 	go func() {

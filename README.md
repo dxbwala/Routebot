@@ -34,7 +34,10 @@ Traffic enters via **nginx** on `:80` / `:443` (API is not exposed publicly).
 
 ```bash
 curl -s http://localhost/healthz
+open http://localhost/dashboard   # QR pairing UI
 ```
+
+**Pair a phone:** open `/dashboard` → sign in → Generate QR → in RouteBot app tap Scan QR.
 
 ## Android agent
 

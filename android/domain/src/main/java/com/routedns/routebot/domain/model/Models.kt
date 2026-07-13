@@ -42,6 +42,25 @@ data class DeviceRegistrationResponse(
 )
 
 @Serializable
+data class EnrollmentQrPayload(
+    val v: Int = 1,
+    @SerialName("server_url") val serverUrl: String,
+    val token: String,
+    @SerialName("expires_at") val expiresAt: String? = null
+)
+
+@Serializable
+data class EnrollmentClaimRequest(
+    val token: String,
+    @SerialName("device_uuid") val deviceUuid: String,
+    val name: String,
+    val manufacturer: String,
+    val model: String,
+    @SerialName("android_version") val androidVersion: String,
+    @SerialName("app_version") val appVersion: String
+)
+
+@Serializable
 data class LoginRequest(
     val email: String,
     val password: String

@@ -30,6 +30,11 @@ interface RouteBotApi {
         @Body body: DeviceRegistrationRequest
     ): ApiResponse<DeviceRegisterData>
 
+    @POST("api/v1/enrollment/claim")
+    suspend fun claimEnrollment(
+        @Body body: com.routedns.routebot.domain.model.EnrollmentClaimRequest
+    ): ApiResponse<DeviceRegisterData>
+
     @POST("api/v1/agent/heartbeat")
     suspend fun heartbeat(
         @Header("X-Device-API-Key") apiKey: String,

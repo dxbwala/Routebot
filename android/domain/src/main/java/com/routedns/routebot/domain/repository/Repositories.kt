@@ -47,6 +47,10 @@ interface AuthRepository {
         request: DeviceRegistrationRequest
     ): Result<DeviceRegistrationResponse>
     suspend fun registerWithApiKey(apiKey: String, serverUrl: String): Result<Unit>
+    suspend fun claimEnrollment(
+        serverUrl: String,
+        request: com.routedns.routebot.domain.model.EnrollmentClaimRequest
+    ): Result<DeviceRegistrationResponse>
 }
 
 interface AgentApiRepository {
@@ -62,6 +66,7 @@ interface AgentApiRepository {
         file: File,
         contentType: String
     ): Result<Unit>
+    suspend fun flushQueue()
 }
 
 interface OfflineQueueRepository {

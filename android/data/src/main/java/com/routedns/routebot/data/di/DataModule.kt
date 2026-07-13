@@ -50,7 +50,4 @@ object DataProvideModule {
 
     @Provides @Singleton
     fun provideJson(provider: JsonProvider): Json = provider.json
-
-    @Provides @Singleton
-    fun provideAgentApiImpl(impl: AgentApiRepositoryImpl): AgentApiRepositoryImpl = impl
 }

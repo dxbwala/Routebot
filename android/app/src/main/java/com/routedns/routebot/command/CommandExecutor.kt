@@ -2,7 +2,6 @@ package com.routedns.routebot.command
 
 import com.routedns.routebot.common.RouteBotLog
 import com.routedns.routebot.data.remote.websocket.AgentWebSocketClient
-import com.routedns.routebot.data.repository.AgentApiRepositoryImpl
 import com.routedns.routebot.domain.model.CommandAckRequest
 import com.routedns.routebot.domain.model.CommandStatus
 import com.routedns.routebot.domain.model.CommandTypes
@@ -30,7 +29,6 @@ import javax.inject.Singleton
 @Singleton
 class CommandExecutor @Inject constructor(
     private val agentApi: AgentApiRepository,
-    private val agentApiImpl: AgentApiRepositoryImpl,
     private val configRepository: ConfigRepository,
     private val secureStorage: SecureStorageRepository,
     private val smsHelper: SmsHelper,
@@ -62,7 +60,7 @@ class CommandExecutor @Inject constructor(
                 webSocketClient.sendPing()
             }
             CommandTypes.SYNC -> {
-                agentApiImpl.flushQueue()
+                agentApi.flushQueue()
             }
             CommandTypes.RESTART_SERVICES -> {
                 serviceController.restartAgent()

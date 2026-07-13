@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Generate a local self-signed TLS cert for nginx (dev only).
+# Production deployments should place a real cert/key at <repo>/certs/{fullchain,privkey}.pem instead.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-CERT_DIR="${ROOT}/deploy/nginx/certs"
+CERT_DIR="${ROOT}/certs"
 mkdir -p "${CERT_DIR}"
 
 if [[ -f "${CERT_DIR}/fullchain.pem" && -f "${CERT_DIR}/privkey.pem" ]]; then

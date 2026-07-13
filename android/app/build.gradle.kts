@@ -10,6 +10,7 @@ plugins {
 android {
     namespace = "com.routedns.routebot"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         applicationId = "com.routedns.routebot"
@@ -78,6 +79,12 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.hilt.work)
     ksp(libs.hilt.compiler)
+
+    implementation(libs.okhttp)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode)
 
     debugImplementation(libs.androidx.compose.ui.tooling.preview)
 }

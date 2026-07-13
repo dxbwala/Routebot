@@ -5,6 +5,7 @@
 *.pem
 *.key
 credentials.json
+/certs/
 
 # Go
 backend/bin/

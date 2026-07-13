@@ -31,6 +31,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -101,6 +103,26 @@ class AuthRepositoryImpl @Inject constructor(
             Result.Success(Unit)
         }
 
+    override suspend fun claimEnrollment(
+        serverUrl: String,
+        request: com.routedns.routebot.domain.model.EnrollmentClaimRequest
+    ): Result<DeviceRegistrationResponse> = withContext(Dispatchers.IO) {
+        try {
+            val base = serverUrl.trim().trimEnd('/')
+            secureStorage.saveServerUrl(base)
+            val response = api(base).claimEnrollment(request)
+            if (response.success && response.data != null) {
+                Result.Success(
+                    DeviceRegistrationResponse(response.data.device, response.data.apiKey)
+                )
+            } else {
+                Result.Error(response.error?.message ?: "Enrollment claim failed")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Enrollment claim failed", e)
+        }
+    }
+
     private fun createApi(baseUrl: String): RouteBotApi {
         val contentType = "application/json".toMediaType()
         val client = okHttpFactory.create(baseUrl)
@@ -134,6 +156,11 @@ class AgentApiRepositoryImpl @Inject constructor(
     }
 
     private suspend fun apiKey(): String? = secureStorage.getApiKey()
+
+    // Guards flushQueue() against concurrent invocations (WS reconnect + SYNC command can
+    // both trigger a flush at the same time), which otherwise peek and dispatch the same
+    // queued SMS/OTP rows twice before either deletes them.
+    private val flushMutex = Mutex()
 
     override suspend fun sendHeartbeat(heartbeat: DeviceHeartbeat): Result<Unit> =
         postOrQueue(EventTypes.HEARTBEAT, heartbeat) { key, api ->
@@ -212,13 +239,15 @@ class AgentApiRepositoryImpl @Inject constructor(
         }
     }
 
-    suspend fun flushQueue() = withContext(Dispatchers.IO) {
-        val key = apiKey() ?: return@withContext
-        val api = api() ?: return@withContext
-        val batch = offlineQueue.peekBatch()
-        for (event in batch) {
-            val ok = dispatchQueued(key, api, event)
-            if (ok) offlineQueue.markSent(event.id) else offlineQueue.markFailed(event.id)
+    override suspend fun flushQueue() = withContext(Dispatchers.IO) {
+        flushMutex.withLock {
+            val key = apiKey() ?: return@withLock
+            val api = api() ?: return@withLock
+            val batch = offlineQueue.peekBatch()
+            for (event in batch) {
+                val ok = dispatchQueued(key, api, event)
+                if (ok) offlineQueue.markSent(event.id) else offlineQueue.markFailed(event.id)
+            }
         }
     }
 

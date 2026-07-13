@@ -2,15 +2,19 @@
 set -eu
 
 CERT_DIR=/etc/nginx/certs
-mkdir -p "${CERT_DIR}"
+CERT="${CERT_DIR}/fullchain.pem"
+KEY="${CERT_DIR}/privkey.pem"
 
-if [ ! -f "${CERT_DIR}/fullchain.pem" ] || [ ! -f "${CERT_DIR}/privkey.pem" ]; then
-  echo "Generating self-signed TLS certificate for nginx..."
+if [ -f "${CERT}" ] && [ -f "${KEY}" ]; then
+  echo "Using mounted TLS certificate: ${CERT}"
+else
+  echo "No certificate found at ${CERT_DIR}; generating a self-signed dev certificate..."
+  mkdir -p "${CERT_DIR}"
   openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
-    -keyout "${CERT_DIR}/privkey.pem" \
-    -out "${CERT_DIR}/fullchain.pem" \
+    -keyout "${KEY}" \
+    -out "${CERT}" \
     -subj "/CN=localhost/O=RouteBot/C=US"
-  chmod 600 "${CERT_DIR}/privkey.pem"
+  chmod 600 "${KEY}"
 fi
 
 nginx -t
