@@ -105,6 +105,10 @@ class AgentApiRepositoryFlushQueueTest {
         override suspend fun getNotificationPackages(): List<String> = emptyList()
         override suspend fun saveCertificatePins(pins: List<String>) {}
         override suspend fun getCertificatePins(): List<String> = emptyList()
+        override suspend fun saveSimPhoneNumbers(numbers: Map<Int, String>) {}
+        override suspend fun getSimPhoneNumbers(): Map<Int, String> = emptyMap()
+        override suspend fun saveSimPhoneUssdAttemptedAt(attempts: Map<Int, Long>) {}
+        override suspend fun getSimPhoneUssdAttemptedAt(): Map<Int, Long> = emptyMap()
         override suspend fun isRegistered(): Boolean = true
         override suspend fun clearAll() {}
     }

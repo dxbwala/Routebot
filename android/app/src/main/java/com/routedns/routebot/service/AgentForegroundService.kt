@@ -46,6 +46,7 @@ class AgentForegroundService : Service() {
     @Inject lateinit var deviceMonitor: DeviceMonitor
     @Inject lateinit var commandExecutor: CommandExecutor
     @Inject lateinit var json: Json
+    @Inject lateinit var simPhoneDiscovery: com.routedns.routebot.ussd.SimPhoneDiscovery
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
@@ -92,6 +93,8 @@ class AgentForegroundService : Service() {
 
     private suspend fun heartbeatLoop() {
         while (scope.isActive) {
+            runCatching { simPhoneDiscovery.ensurePhoneNumbers() }
+                .onFailure { RouteBotLog.w("sim_phone_discover_failed", throwable = it) }
             val snapshot = deviceMonitor.collect(BuildConfig.VERSION_NAME)
             val heartbeat = DeviceHeartbeat(
                 batteryLevel = snapshot.batteryLevel.takeIf { it >= 0 },

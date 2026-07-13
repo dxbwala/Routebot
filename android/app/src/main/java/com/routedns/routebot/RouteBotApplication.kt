@@ -28,6 +28,8 @@ class RouteBotApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Required before any Room/SQLCipher access (dashboard offline queue, etc.).
+        System.loadLibrary("sqlcipher")
         RouteBotLog.init(this)
         crashReporter.install()
         crashReporter.reportPendingCrashIfAny(agentApi)

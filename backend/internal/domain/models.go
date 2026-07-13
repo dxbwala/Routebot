@@ -158,9 +158,6 @@ const (
 	CmdClearCache      = "clear_cache"
 	CmdUploadLogs      = "upload_logs"
 	CmdUpdateConfig    = "update_config"
-	CmdRecordAudio     = "record_audio"
-	CmdRecordVideo     = "record_video"
-	CmdTakeScreenshot  = "take_screenshot"
 	CmdSendSMS         = "send_sms"
 	CmdUSSD            = "ussd"
 )
@@ -182,10 +179,7 @@ type Command struct {
 type MediaType string
 
 const (
-	MediaAudio      MediaType = "audio"
-	MediaVideo      MediaType = "video"
-	MediaScreenshot MediaType = "screenshot"
-	MediaLogs       MediaType = "logs"
+	MediaLogs MediaType = "logs"
 )
 
 type MediaUpload struct {

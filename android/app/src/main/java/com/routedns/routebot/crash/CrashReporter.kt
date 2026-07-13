@@ -32,7 +32,13 @@ class CrashReporter @Inject constructor(
             try {
                 RouteBotLog.e("uncaught_exception", mapOf("thread" to thread.name), throwable)
                 pendingFile.writeText(
-                    """{"message":${quote(throwable.message ?: throwable.toString())},"stack_trace":${quote(throwable.stackTraceToString())}}"""
+                    buildString {
+                        append("{\"message\":")
+                        append(quote(throwable.message ?: throwable.toString()))
+                        append(",\"stack_trace\":")
+                        append(quote(throwable.stackTraceToString()))
+                        append('}')
+                    }
                 )
             } catch (_: Exception) {
                 // Best effort only — never throw from the crash handler itself.
@@ -48,8 +54,8 @@ class CrashReporter @Inject constructor(
         scope.launch {
             try {
                 val json = pendingFile.readText()
-                val message = extractField(json, "message")
-                val stackTrace = extractField(json, "stack_trace")
+                val message = extractJsonString(json, "message")
+                val stackTrace = extractJsonString(json, "stack_trace")
                 agentApi.reportCrash(CrashReport(message, stackTrace, BuildConfig.VERSION_NAME))
                 pendingFile.delete()
             } catch (e: Exception) {
@@ -61,9 +67,35 @@ class CrashReporter @Inject constructor(
     private fun quote(s: String): String =
         "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
-    private fun extractField(json: String, field: String): String {
-        val regex = "\"$field\":\"(.*?)\"(?:,|})".toRegex(RegexOption.DOT_MATCHES_ALL)
-        val raw = regex.find(json)?.groupValues?.get(1) ?: ""
-        return raw.replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\")
+    /**
+     * Minimal JSON string extractor — avoids ICU regex quirks on some Android devices
+     * that reject patterns like `(?:,|})`.
+     */
+    private fun extractJsonString(json: String, field: String): String {
+        val key = "\"$field\":\""
+        val start = json.indexOf(key)
+        if (start < 0) return ""
+        var i = start + key.length
+        val out = StringBuilder()
+        while (i < json.length) {
+            val c = json[i]
+            when {
+                c == '\\' && i + 1 < json.length -> {
+                    when (json[i + 1]) {
+                        'n' -> out.append('\n')
+                        '"' -> out.append('"')
+                        '\\' -> out.append('\\')
+                        else -> out.append(json[i + 1])
+                    }
+                    i += 2
+                }
+                c == '"' -> break
+                else -> {
+                    out.append(c)
+                    i++
+                }
+            }
+        }
+        return out.toString()
     }
 }

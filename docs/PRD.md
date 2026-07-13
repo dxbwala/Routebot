@@ -67,7 +67,7 @@ Requirements
 - Send SMS
 - Receive SMS
 - Delivery report (where supported)
-- Multi SIM support
+- Multi SIM support (`sim_slot`: **1** = SIM 1, **2** = SIM 2)
 - Webhook forwarding
 
 5. OTP Relay
@@ -85,6 +85,7 @@ Requirements
 7. USSD Gateway
 - Initiate USSD requests using supported Android APIs
 - Capture responses only where officially supported by the device/OS
+- Dual-SIM: `sim_slot` 1|2 or Dial/default voice SIM when omitted
 - Clearly document device and Android version limitations
 - Do not rely on unsupported or hidden APIs
 
@@ -136,34 +137,6 @@ Requirements
 - OTP history
 - Command queue
 - Health metrics
-
-14. Remote Audio/Voice recording 
-- Receive command from api/dashboard
-- send recording file
-- delete after send
-- entrypted local storage
-
-
-15.Remote Video Recording
-- Receive command from api/dashboard
-- entrypted local storage
-- send to server
-
-16. Remote Screenshot
-- Receive command from api/dashboard
-- send file to server
-- delete local storate etc
-
-
-
-
-
-
-
-
-
-
-
 
 
 

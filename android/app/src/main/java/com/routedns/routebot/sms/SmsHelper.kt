@@ -12,6 +12,7 @@ import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import androidx.core.content.ContextCompat
 import com.routedns.routebot.common.RouteBotLog
+import com.routedns.routebot.common.SimSlots
 import com.routedns.routebot.domain.model.SmsDirection
 import com.routedns.routebot.domain.model.SmsMessage
 import com.routedns.routebot.domain.repository.AgentApiRepository
@@ -48,14 +49,15 @@ class SmsHelper @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    suspend fun sendSms(address: String, body: String, simSlot: Int = 0): Result<SmsMessage> {
+    suspend fun sendSms(address: String, body: String, simSlot: Int = SimSlots.DEFAULT): Result<SmsMessage> {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS)
             != PackageManager.PERMISSION_GRANTED
         ) {
             return Result.failure(SecurityException("SEND_SMS not granted"))
         }
         return try {
-            val manager = resolveSmsManager(simSlot)
+            val apiSlot = if (simSlot >= SimSlots.SIM_1) simSlot else SimSlots.DEFAULT
+            val manager = resolveSmsManager(apiSlot)
             val parts = manager.divideMessage(body)
             val correlationId = UUID.randomUUID().toString()
             val partCount = parts.size.coerceAtLeast(1)
@@ -87,7 +89,7 @@ class SmsHelper @Inject constructor(
                 direction = SmsDirection.OUTBOUND,
                 address = address,
                 body = body,
-                simSlot = simSlot,
+                simSlot = apiSlot,
                 status = status
             )
 
@@ -117,10 +119,17 @@ class SmsHelper @Inject constructor(
     }
 
     private fun buildPendingIntents(action: String, count: Int): ArrayList<PendingIntent> {
+        // Android 14+ rejects FLAG_MUTABLE with an implicit Intent. Make the Intent
+        // explicit via package, then MUTABLE is allowed for sent/delivery callbacks.
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
-        return ArrayList((0 until count).map {
-            PendingIntent.getBroadcast(context, it, Intent(action), flags)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                0
+            }
+        return ArrayList((0 until count).map { requestCode ->
+            val intent = Intent(action).setPackage(context.packageName)
+            PendingIntent.getBroadcast(context, requestCode, intent, flags)
         })
     }
 
@@ -141,11 +150,17 @@ class SmsHelper @Inject constructor(
     }
 
     @Suppress("DEPRECATION")
-    private fun resolveSmsManager(simSlot: Int): SmsManager {
+    private fun resolveSmsManager(apiSimSlot: Int): SmsManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
             val sm = context.getSystemService(SubscriptionManager::class.java)
             val subs = sm?.activeSubscriptionInfoList.orEmpty()
-            val subId = subs.getOrNull(simSlot)?.subscriptionId
+            val androidSlot = SimSlots.toAndroidSlotIndex(apiSimSlot)
+            // Match physical tray: sim_slot 1 → SIM1 (index 0), sim_slot 2 → SIM2 (index 1).
+            val matched = subs.firstOrNull { it.simSlotIndex == androidSlot }
+                ?: subs.sortedBy { sub ->
+                    sub.simSlotIndex.takeIf { it >= 0 } ?: Int.MAX_VALUE
+                }.getOrNull(androidSlot)
+            val subId = matched?.subscriptionId
             if (subId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 return context.getSystemService(SmsManager::class.java)
                     .createForSubscriptionId(subId)
@@ -153,6 +168,10 @@ class SmsHelper @Inject constructor(
             if (subId != null) {
                 return SmsManager.getSmsManagerForSubscriptionId(subId)
             }
+            RouteBotLog.w(
+                "sms_sim_slot_fallback",
+                mapOf("sim_slot" to apiSimSlot, "active" to subs.size)
+            )
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(SmsManager::class.java)

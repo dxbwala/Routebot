@@ -73,10 +73,8 @@ func NewMediaHandler(svc *service.MediaService) *MediaHandler { return &MediaHan
 
 func (h *MediaHandler) Upload(c fiber.Ctx) error {
 	mediaType := domain.MediaType(c.FormValue("media_type"))
-	switch mediaType {
-	case domain.MediaAudio, domain.MediaVideo, domain.MediaScreenshot:
-	default:
-		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid media_type")
+	if mediaType != domain.MediaLogs {
+		return response.Fail(c, fiber.StatusBadRequest, "bad_request", "invalid media_type (logs only)")
 	}
 	file, err := c.FormFile("file")
 	if err != nil {

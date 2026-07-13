@@ -71,7 +71,7 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
 
-private const val DEFAULT_SERVER_URL = "http://192.168.0.236"
+private const val DEFAULT_SERVER_URL = "https://gateway.routedns.io"
 
 enum class SetupPane { CREDENTIALS, QR, API_KEY }
 
@@ -193,7 +193,9 @@ class SetupViewModel @Inject constructor(
         }
         return DeviceRegistrationRequest(
             deviceUuid = uuid,
-            name = secureStorage.getDeviceName() ?: "${Build.MANUFACTURER} ${Build.MODEL}",
+            name = com.routedns.routebot.common.DeviceNames.auto().also {
+                secureStorage.saveDeviceName(it)
+            },
             manufacturer = Build.MANUFACTURER,
             model = Build.MODEL,
             androidVersion = Build.VERSION.RELEASE,

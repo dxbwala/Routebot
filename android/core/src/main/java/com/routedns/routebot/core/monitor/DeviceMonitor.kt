@@ -17,6 +17,7 @@ import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import com.routedns.routebot.domain.model.DeviceHealthSnapshot
 import com.routedns.routebot.domain.model.SimSlotInfo
+import com.routedns.routebot.common.SimSlots
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.RandomAccessFile
 import javax.inject.Inject
@@ -24,7 +25,9 @@ import javax.inject.Singleton
 
 @Singleton
 class DeviceMonitor @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val telephonyManager: TelephonyManager,
+    private val simPhoneCache: SimPhoneCache
 ) {
     fun collect(appVersion: String): DeviceHealthSnapshot {
         val battery = readBattery()
@@ -84,9 +87,8 @@ class DeviceMonitor @Inject constructor(
     }
 
     /**
-     * Active SIM slots (carrier/display name only — no phone numbers are collected).
-     * Requires READ_PHONE_STATE; returns an empty list where the permission or API is
-     * unavailable rather than failing the whole heartbeat.
+     * Active SIM slots. Phone numbers are filled from telephony when available, otherwise from
+     * [SimPhoneCache] (USSD `*2#` discovery). Never blocks heartbeats on missing numbers.
      */
     private fun readSimInfo(): List<SimSlotInfo> {
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_PHONE_STATE)
@@ -97,12 +99,15 @@ class DeviceMonitor @Inject constructor(
         return try {
             val sm = context.getSystemService(SubscriptionManager::class.java) ?: return emptyList()
             sm.activeSubscriptionInfoList.orEmpty().mapIndexed { index, info ->
+                val androidSlot = info.simSlotIndex.takeIf { it >= 0 } ?: index
+                val phone = resolvePhoneNumber(info.subscriptionId, info)
                 SimSlotInfo(
-                    slotIndex = info.simSlotIndex.takeIf { it >= 0 } ?: index,
+                    slotIndex = SimSlots.toApiSimSlot(androidSlot),
                     subscriptionId = info.subscriptionId,
                     carrierName = info.carrierName?.toString().orEmpty(),
                     displayName = info.displayName?.toString().orEmpty(),
-                    isEmbedded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.isEmbedded else false
+                    isEmbedded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.isEmbedded else false,
+                    phoneNumber = phone
                 )
             }
         } catch (_: SecurityException) {
@@ -110,6 +115,45 @@ class DeviceMonitor @Inject constructor(
         } catch (_: Exception) {
             emptyList()
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun resolvePhoneNumber(
+        subscriptionId: Int,
+        info: android.telephony.SubscriptionInfo
+    ): String {
+        val cached = simPhoneCache.get(subscriptionId).orEmpty().trim()
+        if (cached.isNotEmpty()) return cached
+
+        val fromSub = info.number?.trim().orEmpty()
+        if (looksLikePhone(fromSub)) {
+            simPhoneCache.put(subscriptionId, fromSub)
+            return fromSub
+        }
+
+        return try {
+            val tm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                telephonyManager.createForSubscriptionId(subscriptionId)
+            } else {
+                telephonyManager
+            }
+            val line1 = tm.line1Number?.trim().orEmpty()
+            if (looksLikePhone(line1)) {
+                simPhoneCache.put(subscriptionId, line1)
+                line1
+            } else {
+                ""
+            }
+        } catch (_: SecurityException) {
+            ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun looksLikePhone(raw: String): Boolean {
+        val digits = raw.filter { it.isDigit() }
+        return digits.length in 8..15
     }
 
     fun toHeartbeatFields(snapshot: DeviceHealthSnapshot) = snapshot

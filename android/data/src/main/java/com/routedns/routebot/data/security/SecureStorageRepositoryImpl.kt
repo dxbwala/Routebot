@@ -145,11 +145,55 @@ class SecureStorageRepositoryImpl @Inject constructor(
             ?: emptyList()
     }
 
+    override suspend fun saveSimPhoneNumbers(numbers: Map<Int, String>) = withContext(Dispatchers.IO) {
+        val payload = numbers.entries.joinToString(",") { "${it.key}=${it.value}" }
+        prefs.edit().putString(Constants.KEY_SIM_PHONE_NUMBERS, payload).apply()
+    }
+
+    override suspend fun getSimPhoneNumbers(): Map<Int, String> = withContext(Dispatchers.IO) {
+        parseIntStringMap(prefs.getString(Constants.KEY_SIM_PHONE_NUMBERS, null))
+    }
+
+    override suspend fun saveSimPhoneUssdAttemptedAt(attempts: Map<Int, Long>) = withContext(Dispatchers.IO) {
+        val payload = attempts.entries.joinToString(",") { "${it.key}=${it.value}" }
+        prefs.edit().putString(Constants.KEY_SIM_PHONE_USSD_ATTEMPTED_AT, payload).apply()
+    }
+
+    override suspend fun getSimPhoneUssdAttemptedAt(): Map<Int, Long> = withContext(Dispatchers.IO) {
+        parseIntLongMap(prefs.getString(Constants.KEY_SIM_PHONE_USSD_ATTEMPTED_AT, null))
+    }
+
     override suspend fun isRegistered(): Boolean = withContext(Dispatchers.IO) {
         !getApiKey().isNullOrBlank() && !getServerUrl().isNullOrBlank()
     }
 
     override suspend fun clearAll() = withContext(Dispatchers.IO) {
         prefs.edit().clear().apply()
+    }
+
+    private fun parseIntStringMap(raw: String?): Map<Int, String> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return raw.split(',')
+            .mapNotNull { part ->
+                val idx = part.indexOf('=')
+                if (idx <= 0) return@mapNotNull null
+                val key = part.substring(0, idx).toIntOrNull() ?: return@mapNotNull null
+                val value = part.substring(idx + 1).trim()
+                if (value.isEmpty()) null else key to value
+            }
+            .toMap()
+    }
+
+    private fun parseIntLongMap(raw: String?): Map<Int, Long> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return raw.split(',')
+            .mapNotNull { part ->
+                val idx = part.indexOf('=')
+                if (idx <= 0) return@mapNotNull null
+                val key = part.substring(0, idx).toIntOrNull() ?: return@mapNotNull null
+                val value = part.substring(idx + 1).toLongOrNull() ?: return@mapNotNull null
+                key to value
+            }
+            .toMap()
     }
 }

@@ -105,7 +105,7 @@ data class SmsMessage(
     val direction: SmsDirection,
     val address: String,
     val body: String,
-    @SerialName("sim_slot") val simSlot: Int = 0,
+    @SerialName("sim_slot") val simSlot: Int = 1,
     val status: String = "received",
     @SerialName("provider_ref") val providerRef: String? = null
 )
@@ -190,9 +190,6 @@ data class CommandAckRequest(
 
 @Serializable
 enum class MediaType {
-    @SerialName("audio") AUDIO,
-    @SerialName("video") VIDEO,
-    @SerialName("screenshot") SCREENSHOT,
     @SerialName("logs") LOGS
 }
 
@@ -207,11 +204,14 @@ data class AgentConfig(
 
 @Serializable
 data class SimSlotInfo(
+    /** 1-based tray: 1 = SIM 1, 2 = SIM 2 (matches command payload `sim_slot`). */
     val slotIndex: Int,
     val subscriptionId: Int,
     val carrierName: String = "",
     val displayName: String = "",
-    val isEmbedded: Boolean = false
+    val isEmbedded: Boolean = false,
+    /** MSISDN when known (telephony or USSD *2# discovery); empty if unknown. */
+    val phoneNumber: String = ""
 )
 
 @Serializable
@@ -250,9 +250,6 @@ object CommandTypes {
     const val UPDATE_CONFIG = "update_config"
     const val SEND_SMS = "send_sms"
     const val USSD = "ussd"
-    const val RECORD_AUDIO = "record_audio"
-    const val RECORD_VIDEO = "record_video"
-    const val TAKE_SCREENSHOT = "take_screenshot"
     const val UPLOAD_LOGS = "upload_logs"
 }
 

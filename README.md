@@ -60,6 +60,8 @@ See [`android/README.md`](android/README.md) for permissions, USSD limits, and e
 - [PRD](docs/PRD.md)
 - [Agent rules](docs/AGENT.md)
 - [Architecture](docs/architecture/overview.md)
+- [Dual-SIM / SIM slots](docs/architecture/sim-slots.md)
+- [USSD limitations](docs/architecture/ussd-limitations.md)
 - [REST API](docs/api/rest.md)
 - [WebSocket protocol](docs/api/websocket.md)
 - [Database schema](docs/architecture/database.md)

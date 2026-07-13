@@ -44,6 +44,28 @@ sequenceDiagram
 }
 ```
 
+Examples with dual-SIM payloads (see [sim-slots.md](../architecture/sim-slots.md)):
+
+```json
+{
+  "type": "command",
+  "id": "<uuid>",
+  "command": "send_sms",
+  "payload": { "address": "+15551234567", "body": "hello", "sim_slot": 1 }
+}
+```
+
+```json
+{
+  "type": "command",
+  "id": "<uuid>",
+  "command": "ussd",
+  "payload": { "code": "*121#", "sim_slot": 2 }
+}
+```
+
+`sim_slot`: **`1` = SIM 1**, **`2` = SIM 2**. For `ussd`, omit `sim_slot` to use the Dial/default voice SIM.
+
 ### heartbeat_ack / pong
 
 ```json
@@ -63,4 +85,4 @@ sequenceDiagram
 - Auto-reconnect with exponential backoff
 - Treat missed pong / read deadline (~90s) as disconnect
 - Never drop commands: if WS down, REST will still queue; on reconnect, server flushes `queued` commands
-- Prefer REST for large payloads (media, SMS bodies); WS for control plane
+- Prefer REST for large payloads (log uploads, SMS bodies); WS for control plane

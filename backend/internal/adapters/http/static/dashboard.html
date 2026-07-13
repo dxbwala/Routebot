@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RouteBot Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script src="/static/qrcode.min.js"></script>
   <style>
     :root {
       --bg: #0b1117;
@@ -102,7 +102,20 @@
     .meta { color: var(--muted); font-size: 0.85rem; }
 
     .shell { display: none; min-height: 100vh; min-height: 100dvh; }
-    .shell.on { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+    .shell.on {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+    .shell-body {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      width: 100%;
+    }
     .mobile-bar {
       display: none;
       position: sticky;
@@ -114,12 +127,16 @@
       background: color-mix(in srgb, var(--panel) 92%, black 8%);
       border-bottom: 1px solid var(--line);
       backdrop-filter: blur(8px);
+      flex: 0 0 auto;
     }
     .mobile-bar .title {
       font-family: "IBM Plex Serif", Georgia, serif;
       font-size: 1.15rem;
       flex: 1;
       min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .sidebar-backdrop {
       display: none;
@@ -127,6 +144,7 @@
       inset: 0;
       background: rgba(0, 0, 0, 0.55);
       z-index: 50;
+      -webkit-tap-highlight-color: transparent;
     }
     .sidebar {
       background: color-mix(in srgb, var(--panel) 96%, black 4%);
@@ -137,9 +155,13 @@
       gap: 10px;
       min-height: 100vh;
       min-height: 100dvh;
+      max-height: 100vh;
+      max-height: 100dvh;
       position: sticky;
       top: 0;
       overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
     .brand {
       font-family: "IBM Plex Serif", Georgia, serif;
@@ -190,11 +212,34 @@
     .pill.online { background: #163528; color: var(--ok); }
     .pill.offline { background: #243040; color: var(--offline); }
     .pill.disabled { background: #3a1c22; color: var(--err); }
+    .pill.sim { background: #1a2a3d; color: #9ec5ff; margin-right: 6px; }
+    .sim-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel-2);
+    }
+    .sim-card {
+      flex: 1 1 140px;
+      min-width: 120px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0d1218;
+    }
+    .sim-card .sim-title { font-weight: 650; margin-bottom: 4px; }
+    .sim-card .sim-meta { color: var(--muted); font-size: 0.8rem; line-height: 1.35; }
+    .sim-empty { color: var(--muted); font-size: 0.85rem; }
 
     .main {
       padding: 18px 20px calc(48px + var(--safe-bottom));
       min-width: 0;
       width: 100%;
+      max-width: 1400px;
       overflow-x: hidden;
     }
     .topbar {
@@ -213,6 +258,7 @@
       padding: 16px;
       margin-bottom: 14px;
       min-width: 0;
+      overflow: hidden;
     }
     .panel h3 { margin: 0 0 12px; font-size: 1rem; }
     .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -222,17 +268,18 @@
       gap: 8px 10px;
       font-size: 0.92rem;
     }
-    .kv span { min-width: 0; word-break: break-word; }
+    .kv span { min-width: 0; word-break: break-word; overflow-wrap: anywhere; }
     .kv span:first-child { color: var(--muted); }
     .tabs {
       display: flex;
       gap: 6px;
       flex-wrap: nowrap;
       margin: 0 -4px 12px;
-      padding: 2px 4px 8px;
+      padding: 2px 4px 10px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
+      scroll-snap-type: x proximity;
     }
     .tab {
       background: transparent;
@@ -240,6 +287,7 @@
       border: 1px solid var(--line);
       white-space: nowrap;
       flex: 0 0 auto;
+      scroll-snap-align: start;
     }
     .tab.active { background: #243447; color: var(--text); border-color: #3a516b; }
     .table-wrap {
@@ -248,6 +296,7 @@
       -webkit-overflow-scrolling: touch;
       margin: 0 -2px;
       padding-bottom: 4px;
+      overscroll-behavior-x: contain;
     }
     table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 0.88rem; }
     th, td {
@@ -256,6 +305,7 @@
       border-bottom: 1px solid #243041;
       vertical-align: top;
       word-break: break-word;
+      overflow-wrap: anywhere;
     }
     th { color: var(--muted); font-weight: 600; white-space: nowrap; }
     .empty { color: var(--muted); padding: 18px 4px; }
@@ -269,6 +319,7 @@
     #qr {
       display: inline-block;
       max-width: min(280px, 100%);
+      width: 100%;
       height: auto;
       padding: 12px;
       background: #fff;
@@ -280,6 +331,42 @@
       gap: 8px;
     }
     .cmd-grid button { width: 100%; }
+    .ussd-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0 0 10px;
+    }
+    .ussd-step-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .ussd-step-row .step-idx {
+      flex: 0 0 28px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: right;
+    }
+    .ussd-step-row input {
+      flex: 1 1 auto;
+      margin-bottom: 0;
+      min-width: 0;
+    }
+    .ussd-step-row button {
+      flex: 0 0 auto;
+      min-width: 40px;
+      min-height: 40px;
+      padding: 8px 10px;
+    }
+    .ussd-step-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .ussd-step-actions button { flex: 0 0 auto; }
+    .ussd-presets { margin-bottom: 10px; }
     .live-dot {
       width: 8px; height: 8px; border-radius: 50%;
       display: inline-block; margin-right: 6px; background: var(--offline);
@@ -291,8 +378,13 @@
     .devices-layout.selected-mobile #fleetPanel { display: none; }
     .devices-layout.selected-mobile .back-devices { display: inline-flex; }
 
+    @media (max-width: 1100px) {
+      .main { max-width: none; }
+      .cmd-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+    }
+
     @media (max-width: 900px) {
-      .shell.on { grid-template-columns: 1fr; }
+      .shell-body { display: block; min-height: 0; }
       .mobile-bar { display: flex; }
       .sidebar-backdrop.open { display: block; }
       .sidebar {
@@ -300,30 +392,79 @@
         top: 0;
         left: 0;
         bottom: 0;
-        width: min(var(--sidebar-w), 86vw);
+        width: min(var(--sidebar-w), calc(100vw - 48px));
+        max-width: 320px;
         z-index: 60;
         transform: translateX(-105%);
-        transition: transform 0.2s ease;
+        transition: transform 0.22s ease;
         border-right: 1px solid var(--line);
         box-shadow: 12px 0 40px rgba(0, 0, 0, 0.35);
+        padding-top: calc(18px + var(--safe-top));
+        min-height: 100vh;
+        min-height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
       }
       .shell.nav-open .sidebar { transform: translateX(0); }
-      .main { padding: 14px 12px calc(28px + var(--safe-bottom)); }
+      .main {
+        padding: 12px 12px calc(28px + var(--safe-bottom));
+        max-width: none;
+      }
       .grid-2 { grid-template-columns: 1fr; }
       .device-list { max-height: none; }
       .panel { padding: 14px 12px; border-radius: 12px; }
       .cmd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .brand { display: none; }
+      #viewDevices > .topbar { display: none; }
+      #viewPair > .topbar,
+      #viewWebhooks > .topbar { margin-bottom: 10px; }
+      .devices-layout:not(.selected-mobile) #deviceDetail { display: none; }
+      .ussd-step-actions button { flex: 1 1 calc(50% - 4px); }
+      #sendSmsBtn,
+      #sendUssdBtn,
+      #sendCustomBtn,
+      #createHookBtn,
+      #qrBtn { width: 100%; }
+      .pair-panel { max-width: none !important; }
+      .sim-card { flex: 1 1 100%; min-width: 0; }
     }
 
     @media (max-width: 560px) {
-      .auth { width: calc(100% - 24px); margin: 16px auto; padding: 18px 14px; }
+      .auth { width: calc(100% - 20px); margin: 12px auto; padding: 16px 14px; }
+      .auth .row { flex-direction: column; align-items: stretch; }
+      .auth .row button { width: 100%; min-width: 0; }
       .kv { grid-template-columns: 1fr; gap: 2px 0; }
       .kv span:first-child { margin-top: 6px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
-      .cmd-grid { grid-template-columns: 1fr 1fr; }
-      table { min-width: 460px; font-size: 0.82rem; }
+      .cmd-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      table { min-width: 420px; font-size: 0.8rem; }
       th, td { padding: 8px 6px; }
       .row > button { flex: 1 1 calc(50% - 4px); }
+      .topbar { gap: 8px; }
+      .tabs { margin-left: -8px; margin-right: -8px; padding-left: 8px; padding-right: 8px; }
+      .ussd-step-actions { flex-direction: column; }
+      .ussd-step-actions button { width: 100%; flex: 1 1 auto; }
+    }
+
+    @media (max-width: 380px) {
+      .cmd-grid { grid-template-columns: 1fr; }
+      .row > button { flex: 1 1 100%; }
+      table { min-width: 360px; }
+    }
+
+    /* Short landscape phones / small tablets */
+    @media (max-height: 480px) and (orientation: landscape) {
+      .mobile-bar { padding-top: 8px; padding-bottom: 8px; }
+      .sidebar { padding-top: 12px; }
+      .device-list { max-height: min(40vh, 220px); }
+      .auth { margin: 12px auto; }
+    }
+
+    @media (min-width: 901px) and (max-width: 1100px) {
+      :root { --sidebar-w: 240px; }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .tab, .nav-btn, .device-item { min-height: 44px; }
     }
   </style>
 </head>
@@ -332,7 +473,7 @@
     <h1>RouteBot</h1>
     <p class="sub">Sign in to manage devices, send commands, and view live telemetry.</p>
     <label for="email">Email</label>
-    <input id="email" type="email" autocomplete="username" value="admin@routedns.io" />
+    <input id="email" type="email" autocomplete="username" />
     <label for="password">Password</label>
     <input id="password" type="password" autocomplete="current-password" />
     <div class="row">
@@ -344,11 +485,12 @@
 
   <div class="shell" id="appView">
     <div class="mobile-bar" id="mobileBar">
-      <button class="icon-btn" id="menuBtn" type="button" aria-label="Open menu">☰</button>
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">☰</button>
       <div class="title" id="mobileTitle">Devices</div>
       <button class="icon-btn secondary" id="mobileRefreshBtn" type="button" aria-label="Refresh">↻</button>
     </div>
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="shell-body">
     <aside class="sidebar" id="sidebar">
       <div class="brand">RouteBot</div>
       <div class="sidebar-nav">
@@ -389,11 +531,13 @@
             <button class="tab" data-tab="otp" type="button">OTP</button>
             <button class="tab" data-tab="notifications" type="button">Notifications</button>
             <button class="tab" data-tab="calls" type="button">Calls</button>
-            <button class="tab" data-tab="media" type="button">Media</button>
             <button class="tab" data-tab="history" type="button">Command history</button>
           </div>
           <div id="tabCommands">
             <h3>Remote commands</h3>
+            <div id="simStrip" class="sim-strip">
+              <div class="sim-empty">Select a device to load SIM slots</div>
+            </div>
             <div class="cmd-grid" id="quickCmds"></div>
             <div class="grid-2" style="margin-top:14px">
               <div>
@@ -402,22 +546,50 @@
                 <input id="smsAddress" placeholder="+15551234567" />
                 <label>Body</label>
                 <textarea id="smsBody" placeholder="Message text"></textarea>
-                <label>SIM slot</label>
-                <input id="smsSlot" type="number" value="0" min="0" />
+                <label for="smsSlot">SIM</label>
+                <select id="smsSlot">
+                  <option value="1">SIM 1</option>
+                  <option value="2">SIM 2</option>
+                </select>
                 <button id="sendSmsBtn" type="button">Queue send_sms</button>
               </div>
               <div>
                 <h3>USSD</h3>
-                <label>Code</label>
-                <input id="ussdCode" placeholder="*121#" />
-                <label>Subscription ID (optional)</label>
-                <input id="ussdSub" type="number" placeholder="leave blank" />
+                <label for="ussdCode">Code</label>
+                <input id="ussdCode" placeholder="*247#" />
+                <label for="ussdSlot">SIM</label>
+                <select id="ussdSlot">
+                  <option value="">Dial / default voice SIM</option>
+                  <option value="1">SIM 1</option>
+                  <option value="2">SIM 2</option>
+                </select>
+                <label for="ussdPreset">Preset (optional)</label>
+                <select id="ussdPreset" class="ussd-presets">
+                  <option value="">Custom steps…</option>
+                  <option value="*121#|">*121# — single shot</option>
+                  <option value="*247#|9,1,2255">*247# — Check Balance (9→1→PIN)</option>
+                  <option value="*247#|9,2,2255">*247# — Statement list (9→2→PIN)</option>
+                  <option value="*247#|9,2,2255,1">*247# — Statement #1 (9→2→PIN→1)</option>
+                </select>
+                <label>Steps (menu replies, in order)</label>
+                <div id="ussdSteps" class="ussd-steps"></div>
+                <div class="ussd-step-actions">
+                  <button id="ussdAddStepBtn" class="small secondary" type="button">+ Add step</button>
+                  <button id="ussdClearStepsBtn" class="small ghost" type="button">Clear steps</button>
+                </div>
+                <label for="ussdStepsCsv">Or paste steps (comma / newline)</label>
+                <input id="ussdStepsCsv" placeholder="9, 2, 2255, 1" />
+                <details style="margin:6px 0 12px">
+                  <summary class="meta" style="cursor:pointer">Advanced: subscription ID override</summary>
+                  <label for="ussdSub" style="margin-top:8px">Subscription ID</label>
+                  <input id="ussdSub" type="number" placeholder="from heartbeat sim_info" />
+                </details>
                 <button id="sendUssdBtn" type="button">Queue ussd</button>
                 <h3 style="margin-top:18px">Custom JSON payload</h3>
                 <label>Command type</label>
                 <select id="customType"></select>
                 <label>Payload JSON</label>
-                <textarea id="customPayload" placeholder='{"key":"value"}'>{}</textarea>
+                <textarea id="customPayload" placeholder='{"code":"*247#","sim_slot":1,"steps":["9","2","2255"]}'>{"sim_slot":1}</textarea>
                 <button id="sendCustomBtn" class="secondary" type="button">Queue command</button>
               </div>
             </div>
@@ -430,6 +602,7 @@
               <button class="small secondary" id="reloadHealthBtn" type="button">Reload</button>
             </div>
             <div id="healthLatest" class="kv"></div>
+            <div id="healthSims"></div>
             <h3 style="margin-top:16px">History</h3>
             <div id="healthHistory"></div>
           </div>
@@ -437,14 +610,13 @@
           <div id="tabOtp" class="hidden"></div>
           <div id="tabNotifications" class="hidden"></div>
           <div id="tabCalls" class="hidden"></div>
-          <div id="tabMedia" class="hidden"></div>
           <div id="tabHistory" class="hidden"></div>
         </div>
       </div>
 
       <div id="viewPair" class="hidden">
         <div class="topbar"><h2>Pair device</h2></div>
-        <div class="panel" style="max-width:520px;width:100%">
+        <div class="panel pair-panel" style="max-width:520px;width:100%">
           <label for="deviceName">Device name (optional)</label>
           <input id="deviceName" type="text" placeholder="Warehouse phone 1" />
           <div class="row">
@@ -482,13 +654,13 @@
         </div>
       </div>
     </section>
+    </div>
   </div>
 
   <script>
     const COMMAND_TYPES = [
       'ping', 'sync', 'restart_services', 'refresh_config', 'clear_cache',
-      'upload_logs', 'update_config', 'record_audio', 'record_video',
-      'take_screenshot', 'send_sms', 'ussd'
+      'upload_logs', 'update_config', 'send_sms', 'ussd'
     ];
     const QUICK_COMMANDS = [
       { type: 'ping', label: 'Ping' },
@@ -496,9 +668,6 @@
       { type: 'restart_services', label: 'Restart agent' },
       { type: 'refresh_config', label: 'Refresh config' },
       { type: 'upload_logs', label: 'Upload logs' },
-      { type: 'take_screenshot', label: 'Screenshot' },
-      { type: 'record_audio', label: 'Record audio', payload: { duration_sec: 10 } },
-      { type: 'record_video', label: 'Record video', payload: { duration_sec: 10 } },
       { type: 'clear_cache', label: 'Clear cache', danger: true },
     ];
 
@@ -509,6 +678,7 @@
       selectedId: null,
       tab: 'commands',
       liveSource: null,
+      simInfo: [],
     };
 
     const $ = (id) => document.getElementById(id);
@@ -672,12 +842,15 @@
           <span>API key prefix</span><span class="mono">${escapeHtml(d.api_key_prefix || '—')}</span>
         </div>
       ` : '<div class="empty">Not found</div>';
+      await loadSimInfo();
       switchTab(state.tab);
       startLive(id);
     }
 
     function clearSelectedDevice() {
       state.selectedId = null;
+      state.simInfo = [];
+      renderSimStrip([]);
       stopLive();
       updateDevicesMobileLayout();
       setMobileTitle('Devices');
@@ -689,7 +862,11 @@
     function switchTab(tab) {
       state.tab = tab;
       document.querySelectorAll('#detailTabs .tab').forEach((t) => {
-        t.classList.toggle('active', t.dataset.tab === tab);
+        const on = t.dataset.tab === tab;
+        t.classList.toggle('active', on);
+        if (on && typeof t.scrollIntoView === 'function') {
+          t.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
       });
       $('tabCommands').classList.toggle('hidden', tab !== 'commands');
       $('tabHealth').classList.toggle('hidden', tab !== 'health');
@@ -697,7 +874,6 @@
       $('tabOtp').classList.toggle('hidden', tab !== 'otp');
       $('tabNotifications').classList.toggle('hidden', tab !== 'notifications');
       $('tabCalls').classList.toggle('hidden', tab !== 'calls');
-      $('tabMedia').classList.toggle('hidden', tab !== 'media');
       $('tabHistory').classList.toggle('hidden', tab !== 'history');
       if (!state.selectedId) return;
       if (tab === 'health') loadHealth();
@@ -705,7 +881,6 @@
       if (tab === 'otp') loadTable('otp', '/devices/' + state.selectedId + '/otp', 'otp', renderOtp);
       if (tab === 'notifications') loadTable('notifications', '/devices/' + state.selectedId + '/notifications', 'notifications', renderNotif);
       if (tab === 'calls') loadTable('calls', '/devices/' + state.selectedId + '/calls', 'calls', renderCalls);
-      if (tab === 'media') loadMedia();
       if (tab === 'history') loadTable('history', '/devices/' + state.selectedId + '/commands', 'commands', renderCommands);
     }
 
@@ -717,6 +892,11 @@
     function setNavOpen(open) {
       $('appView').classList.toggle('nav-open', open);
       $('sidebarBackdrop').classList.toggle('open', open);
+      const menuBtn = $('menuBtn');
+      if (menuBtn) {
+        menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menuBtn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      }
       document.body.style.overflow = open ? 'hidden' : '';
     }
 
@@ -728,6 +908,16 @@
       const layout = $('devicesLayout');
       if (!layout) return;
       layout.classList.toggle('selected-mobile', Boolean(state.selectedId) && isMobile());
+      if (state.selectedId && isMobile()) {
+        const d = state.devices.find((x) => x.id === state.selectedId);
+        setMobileTitle(d?.name || d?.device_name || 'Device');
+      } else if (!$('viewPair').classList.contains('hidden')) {
+        setMobileTitle('Pair device');
+      } else if (!$('viewWebhooks').classList.contains('hidden')) {
+        setMobileTitle('Webhooks');
+      } else {
+        setMobileTitle('Devices');
+      }
     }
 
     function setMobileTitle(text) {
@@ -739,6 +929,85 @@
       return String(s ?? '').replace(/[&<>"']/g, (c) => ({
         '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
       }[c]));
+    }
+
+    /** API sim_slot / slotIndex is 1-based: 1 = SIM 1, 2 = SIM 2. */
+    function formatSimSlot(slot) {
+      const n = Number(slot);
+      if (!Number.isFinite(n) || n < 1) return '—';
+      return 'SIM ' + n;
+    }
+
+    function parseSimInfo(raw) {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        try { return parseSimInfo(JSON.parse(raw)); } catch { return []; }
+      }
+      return [];
+    }
+
+    function renderSimStrip(sims) {
+      const el = $('simStrip');
+      if (!el) return;
+      if (!sims.length) {
+        el.innerHTML = '<div class="sim-empty">No SIM info yet — wait for a heartbeat (sim_slot: 1 = SIM 1, 2 = SIM 2).</div>';
+        return;
+      }
+      el.innerHTML = sims.map((s) => {
+        const slot = s.slotIndex ?? s.slot_index ?? s.sim_slot;
+        const name = s.displayName || s.display_name || formatSimSlot(slot);
+        const carrier = s.carrierName || s.carrier_name || '—';
+        const sub = s.subscriptionId ?? s.subscription_id ?? '—';
+        const phone = s.phoneNumber || s.phone_number || '';
+        const embedded = s.isEmbedded || s.is_embedded ? ' · eSIM' : '';
+        return `<div class="sim-card">
+          <div class="sim-title"><span class="pill sim">${escapeHtml(formatSimSlot(slot))}</span> ${escapeHtml(name)}</div>
+          <div class="sim-meta">${escapeHtml(carrier)}${embedded}<br>Number: <span class="mono">${escapeHtml(phone || '—')}</span><br>subscription_id: <span class="mono">${escapeHtml(sub)}</span></div>
+        </div>`;
+      }).join('');
+    }
+
+    function refreshSimSelectors(sims) {
+      const present = new Set(
+        sims.map((s) => Number(s.slotIndex ?? s.slot_index ?? s.sim_slot)).filter((n) => n === 1 || n === 2)
+      );
+      const mark = (opt, slot) => {
+        if (!opt) return;
+        const active = !present.size || present.has(slot);
+        opt.disabled = !active;
+        const base = slot === 1 ? 'SIM 1' : 'SIM 2';
+        opt.textContent = active ? base : base + ' (not reported)';
+      };
+      mark($('smsSlot')?.querySelector('option[value="1"]'), 1);
+      mark($('smsSlot')?.querySelector('option[value="2"]'), 2);
+      mark($('ussdSlot')?.querySelector('option[value="1"]'), 1);
+      mark($('ussdSlot')?.querySelector('option[value="2"]'), 2);
+      // Prefer first reported active SIM for SMS default.
+      if (present.size && $('smsSlot')) {
+        const prefer = present.has(1) ? '1' : [...present][0];
+        if (!$('smsSlot').value || !present.has(Number($('smsSlot').value))) {
+          $('smsSlot').value = String(prefer);
+        }
+      }
+    }
+
+    async function loadSimInfo() {
+      if (!state.selectedId) {
+        state.simInfo = [];
+        renderSimStrip([]);
+        return;
+      }
+      try {
+        const latest = await api('/devices/' + state.selectedId + '/health');
+        const h = latest.health || {};
+        state.simInfo = parseSimInfo(h.sim_info || h.simInfo);
+        renderSimStrip(state.simInfo);
+        refreshSimSelectors(state.simInfo);
+      } catch {
+        state.simInfo = [];
+        renderSimStrip([]);
+      }
     }
 
     async function queueCommand(type, payload = {}) {
@@ -774,16 +1043,42 @@
       try {
         const latest = await api('/devices/' + state.selectedId + '/health');
         const h = latest.health || {};
+        state.simInfo = parseSimInfo(h.sim_info || h.simInfo);
+        renderSimStrip(state.simInfo);
+        refreshSimSelectors(state.simInfo);
+        const simSummary = state.simInfo.length
+          ? state.simInfo.map((s) => {
+              const slot = s.slotIndex ?? s.slot_index;
+              const carrier = s.carrierName || s.carrier_name || '';
+              return formatSimSlot(slot) + (carrier ? ' (' + carrier + ')' : '');
+            }).join(', ')
+          : '—';
         $('healthLatest').innerHTML = [
           ['Battery', (h.battery_level ?? '—') + (h.is_charging ? '% (charging)' : '%')],
           ['Network', h.network_type || '—'],
           ['Wi‑Fi', h.wifi_ssid || '—'],
           ['Signal', h.signal_strength ?? '—'],
+          ['SIMs', simSummary],
           ['CPU', h.cpu_usage ?? '—'],
           ['RAM free MB', h.ram_free_mb ?? '—'],
           ['Storage free MB', h.storage_free_mb ?? '—'],
           ['Reported', h.reported_at || '—'],
         ].map(([k,v]) => `<span>${k}</span><span>${escapeHtml(v)}</span>`).join('');
+
+        // Detailed SIM cards under health latest
+        const hs = $('healthSims');
+        if (hs) {
+          hs.innerHTML = state.simInfo.length
+            ? `<div class="sim-strip" style="margin-top:12px">${state.simInfo.map((s) => {
+                const slot = s.slotIndex ?? s.slot_index;
+                const name = s.displayName || s.display_name || formatSimSlot(slot);
+                const carrier = s.carrierName || s.carrier_name || '—';
+                const sub = s.subscriptionId ?? s.subscription_id ?? '—';
+                const phone = s.phoneNumber || s.phone_number || '';
+                return `<div class="sim-card"><div class="sim-title"><span class="pill sim">${escapeHtml(formatSimSlot(slot))}</span> ${escapeHtml(name)}</div><div class="sim-meta">${escapeHtml(carrier)}<br>Number: <span class="mono">${escapeHtml(phone || '—')}</span><br>subscription_id: <span class="mono">${escapeHtml(sub)}</span></div></div>`;
+              }).join('')}</div>`
+            : '';
+        }
 
         const hist = await api('/devices/' + state.selectedId + '/health/history');
         const rows = hist.health || hist.history || hist.items || [];
@@ -803,6 +1098,8 @@
       } catch (e) {
         const msg = /not found/i.test(e.message) ? 'No heartbeat yet — device has not checked in.' : e.message;
         $('healthLatest').innerHTML = `<span></span><span class="status ${/not found/i.test(e.message) ? '' : 'err'}">${escapeHtml(msg)}</span>`;
+        const hs = $('healthSims');
+        if (hs) hs.innerHTML = '';
         $('healthHistory').innerHTML = '<div class="empty">No health samples yet</div>';
       }
     }
@@ -863,6 +1160,7 @@
                   }
                 }
                 if (state.tab === 'health' && state.selectedId === deviceId) loadHealth();
+                else if (state.selectedId === deviceId) loadSimInfo();
               } catch { /* ignore parse errors */ }
             }
           }
@@ -895,9 +1193,10 @@
 
     function renderSms(rows) {
       if (!rows.length) return '<div class="empty">No SMS</div>';
-      return `<table><thead><tr><th>When</th><th>Dir</th><th>Address</th><th>Body</th><th>Status</th></tr></thead><tbody>
+      return `<table><thead><tr><th>When</th><th>SIM</th><th>Dir</th><th>Address</th><th>Body</th><th>Status</th></tr></thead><tbody>
         ${rows.map((r) => `<tr>
           <td>${escapeHtml(r.created_at || r.received_at || '')}</td>
+          <td><span class="pill sim">${escapeHtml(formatSimSlot(r.sim_slot))}</span></td>
           <td>${escapeHtml(r.direction || '')}</td>
           <td>${escapeHtml(r.address || '')}</td>
           <td>${escapeHtml(r.body || '')}</td>
@@ -942,60 +1241,22 @@
     }
     function renderCommands(rows) {
       if (!rows.length) return '<div class="empty">No commands</div>';
-      return `<table><thead><tr><th>When</th><th>Type</th><th>Status</th><th>Payload</th></tr></thead><tbody>
-        ${rows.map((r) => `<tr>
+      return `<table><thead><tr><th>When</th><th>Type</th><th>SIM</th><th>Status</th><th>Payload</th></tr></thead><tbody>
+        ${rows.map((r) => {
+          const p = typeof r.payload === 'string' ? (() => { try { return JSON.parse(r.payload); } catch { return {}; } })() : (r.payload || {});
+          const slot = p.sim_slot;
+          const simLabel = slot != null && slot !== '' && Number(slot) > 0
+            ? formatSimSlot(slot)
+            : (r.command_type === 'ussd' ? 'Dial SIM' : '—');
+          return `<tr>
           <td>${escapeHtml(r.created_at || '')}</td>
           <td>${escapeHtml(r.command_type || '')}</td>
+          <td>${escapeHtml(simLabel)}</td>
           <td>${escapeHtml(r.status || '')}</td>
           <td class="mono">${escapeHtml(typeof r.payload === 'string' ? r.payload : JSON.stringify(r.payload || {}))}</td>
-        </tr>`).join('')}
+        </tr>`;
+        }).join('')}
       </tbody></table>`;
-    }
-
-    async function loadMedia() {
-      const el = $('tabMedia');
-      el.innerHTML = '<div class="empty">Loading…</div>';
-      try {
-        const data = await api('/devices/' + state.selectedId + '/media');
-        const rows = data.media || [];
-        if (!rows.length) {
-          el.innerHTML = '<div class="empty">No media uploads</div>';
-          return;
-        }
-        el.innerHTML = wrapTable(`<table><thead><tr><th>When</th><th>Type</th><th>Content</th><th>Size</th><th></th></tr></thead><tbody>
-          ${rows.map((r) => `<tr>
-            <td>${escapeHtml(r.created_at || '')}</td>
-            <td>${escapeHtml(r.media_type || '')}</td>
-            <td>${escapeHtml(r.content_type || '')}</td>
-            <td>${escapeHtml(r.size_bytes ?? '')}</td>
-            <td><a href="/api/v1/media/${encodeURIComponent(r.id)}" target="_blank" rel="noopener">Download</a></td>
-          </tr>`).join('')}
-        </tbody></table>`) +
-        `<p class="status">Downloads use your signed-in session token.</p>`;
-        // Fix download with Authorization via blob fetch
-        el.querySelectorAll('a').forEach((a) => {
-          a.onclick = async (ev) => {
-            ev.preventDefault();
-            const id = a.getAttribute('href').split('/').pop();
-            const res = await fetch('/api/v1/media/' + id, {
-              headers: { Authorization: 'Bearer ' + state.access },
-            });
-            if (!res.ok) {
-              alert('Download failed: HTTP ' + res.status);
-              return;
-            }
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const tmp = document.createElement('a');
-            tmp.href = url;
-            tmp.download = id;
-            tmp.click();
-            URL.revokeObjectURL(url);
-          };
-        });
-      } catch (e) {
-        el.innerHTML = `<div class="status err">${escapeHtml(e.message)}</div>`;
-      }
     }
 
     async function loadWebhooks() {
@@ -1027,7 +1288,13 @@
     $('menuBtn').onclick = () => setNavOpen(!$('appView').classList.contains('nav-open'));
     $('sidebarBackdrop').onclick = () => setNavOpen(false);
     $('backDevicesBtn').onclick = () => clearSelectedDevice();
-    window.addEventListener('resize', () => updateDevicesMobileLayout());
+    window.addEventListener('resize', () => {
+      updateDevicesMobileLayout();
+      if (!isMobile()) setNavOpen(false);
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') setNavOpen(false);
+    });
     document.querySelectorAll('.nav-btn[data-view]').forEach((b) => {
       b.onclick = () => switchView(b.dataset.view);
     });
@@ -1036,24 +1303,116 @@
     });
     $('reloadHealthBtn').onclick = () => loadHealth();
 
+    function renderUssdSteps(values) {
+      const root = $('ussdSteps');
+      if (!root) return;
+      const steps = (values && values.length) ? values : [''];
+      root.innerHTML = steps.map((v, i) => `
+        <div class="ussd-step-row" data-idx="${i}">
+          <span class="step-idx">${i + 1}.</span>
+          <input type="text" class="ussd-step-input" value="${escapeHtml(v)}" placeholder="e.g. 9 or PIN" autocomplete="off" />
+          <button class="small ghost ussd-remove-step" type="button" title="Remove step" aria-label="Remove step">✕</button>
+        </div>
+      `).join('');
+      root.querySelectorAll('.ussd-remove-step').forEach((btn) => {
+        btn.onclick = () => {
+          const keep = [];
+          root.querySelectorAll('.ussd-step-row').forEach((row) => {
+            if (row.contains(btn)) return;
+            const inp = row.querySelector('.ussd-step-input');
+            keep.push(inp ? inp.value : '');
+          });
+          renderUssdSteps(keep.length ? keep : ['']);
+          syncUssdStepsCsv();
+        };
+      });
+      root.querySelectorAll('.ussd-step-input').forEach((inp) => {
+        inp.oninput = () => syncUssdStepsCsv();
+      });
+    }
+
+    function collectUssdSteps() {
+      return Array.from(document.querySelectorAll('#ussdSteps .ussd-step-input'))
+        .map((el) => el.value.trim())
+        .filter((v) => v.length > 0);
+    }
+
+    function parseStepsCsv(raw) {
+      return String(raw || '')
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    function syncUssdStepsCsv() {
+      const el = $('ussdStepsCsv');
+      if (el) el.value = collectUssdSteps().join(', ');
+    }
+
+    function applyUssdPreset() {
+      const raw = $('ussdPreset')?.value || '';
+      if (!raw) return;
+      const [code, stepsPart] = raw.split('|');
+      if (code) $('ussdCode').value = code;
+      const steps = parseStepsCsv(stepsPart || '');
+      renderUssdSteps(steps.length ? steps : ['']);
+      syncUssdStepsCsv();
+    }
+
+    renderUssdSteps(['']);
+    $('ussdAddStepBtn').onclick = () => {
+      const cur = Array.from(document.querySelectorAll('#ussdSteps .ussd-step-input')).map((el) => el.value);
+      cur.push('');
+      renderUssdSteps(cur);
+      const inputs = document.querySelectorAll('#ussdSteps .ussd-step-input');
+      inputs[inputs.length - 1]?.focus();
+    };
+    $('ussdClearStepsBtn').onclick = () => {
+      renderUssdSteps(['']);
+      syncUssdStepsCsv();
+      if ($('ussdPreset')) $('ussdPreset').value = '';
+    };
+    $('ussdPreset').onchange = () => applyUssdPreset();
+    $('ussdStepsCsv').onchange = () => {
+      const steps = parseStepsCsv($('ussdStepsCsv').value);
+      renderUssdSteps(steps.length ? steps : ['']);
+      syncUssdStepsCsv();
+    };
+    $('ussdStepsCsv').onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const steps = parseStepsCsv($('ussdStepsCsv').value);
+        renderUssdSteps(steps.length ? steps : ['']);
+        syncUssdStepsCsv();
+      }
+    };
+
     $('sendSmsBtn').onclick = async () => {
       setStatus($('cmdStatus'), 'Queuing send_sms…');
       try {
         await queueCommand('send_sms', {
           address: $('smsAddress').value.trim(),
           body: $('smsBody').value,
-          sim_slot: Number($('smsSlot').value || 0),
+          sim_slot: Number($('smsSlot').value || 1),
         });
-        setStatus($('cmdStatus'), 'Queued send_sms', true);
+        setStatus($('cmdStatus'), 'Queued send_sms → ' + formatSimSlot($('smsSlot').value || 1), true);
       } catch (e) { setStatus($('cmdStatus'), e.message, false); }
     };
     $('sendUssdBtn').onclick = async () => {
       setStatus($('cmdStatus'), 'Queuing ussd…');
       try {
-        const payload = { code: $('ussdCode').value.trim() };
+        const code = $('ussdCode').value.trim();
+        if (!code) throw new Error('USSD code required');
+        const payload = { code };
+        const slot = $('ussdSlot').value.trim();
+        if (slot !== '') payload.sim_slot = Number(slot);
         if ($('ussdSub').value !== '') payload.subscription_id = Number($('ussdSub').value);
+        const steps = collectUssdSteps();
+        if (steps.length) payload.steps = steps;
         await queueCommand('ussd', payload);
-        setStatus($('cmdStatus'), 'Queued ussd', true);
+        const via = slot ? formatSimSlot(slot) : 'Dial / default voice SIM';
+        const stepTxt = steps.length ? ` · steps [${steps.join(' → ')}]` : '';
+        setStatus($('cmdStatus'), 'Queued ussd → ' + via + stepTxt, true);
       } catch (e) { setStatus($('cmdStatus'), e.message, false); }
     };
     $('sendCustomBtn').onclick = async () => {
@@ -1068,6 +1427,9 @@
     $('qrBtn').onclick = async () => {
       setStatus($('pairStatus'), 'Creating token…');
       try {
+        if (typeof QRCode === 'undefined' || typeof QRCode.toCanvas !== 'function') {
+          throw new Error('QR library failed to load — refresh and try again');
+        }
         const data = await api('/enrollment/tokens', {
           method: 'POST',
           body: JSON.stringify({ device_name: $('deviceName').value.trim() }),

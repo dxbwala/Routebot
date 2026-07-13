@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.telephony.PhoneStateListener
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
@@ -18,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,7 +30,7 @@ class CallStateMonitor @Inject constructor(
     private val agentApi: AgentApiRepository
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var lastState = TelephonyManager.CALL_STATE_IDLE
+    private val lastStateBySub = ConcurrentHashMap<Int, Int>()
     private var listenerRegistered = false
 
     fun start() {
@@ -39,24 +41,52 @@ class CallStateMonitor @Inject constructor(
             RouteBotLog.w("call_monitor_no_permission")
             return
         }
+        val managers = resolveTelephonyManagers()
+        for ((subId, tm) in managers) {
+            register(subId, tm)
+        }
+        listenerRegistered = true
+        RouteBotLog.i("call_monitor_started", mapOf("subs" to managers.size))
+    }
+
+    private fun resolveTelephonyManagers(): List<Pair<Int, TelephonyManager>> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) {
+            return listOf(-1 to telephonyManager)
+        }
+        val sm = context.getSystemService(SubscriptionManager::class.java)
+        val subs = sm?.activeSubscriptionInfoList.orEmpty()
+        if (subs.isEmpty()) {
+            return listOf(-1 to telephonyManager)
+        }
+        return subs.map { info ->
+            info.subscriptionId to telephonyManager.createForSubscriptionId(info.subscriptionId)
+        }
+    }
+
+    private fun register(subId: Int, tm: TelephonyManager) {
+        lastStateBySub.putIfAbsent(subId, TelephonyManager.CALL_STATE_IDLE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
-                override fun onCallStateChanged(state: Int) = handleState(state)
+                override fun onCallStateChanged(state: Int) = handleState(subId, state)
             }
-            telephonyManager.registerTelephonyCallback(context.mainExecutor, callback)
+            tm.registerTelephonyCallback(context.mainExecutor, callback)
         } else {
             @Suppress("DEPRECATION")
-            telephonyManager.listen(object : PhoneStateListener() {
+            tm.listen(object : PhoneStateListener() {
                 @Deprecated("Deprecated in Java")
                 override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                    handleState(state, phoneNumber)
+                    handleState(subId, state, phoneNumber)
                 }
             }, PhoneStateListener.LISTEN_CALL_STATE)
         }
-        listenerRegistered = true
     }
 
-    private fun handleState(state: Int, number: String? = null) {
+    private fun handleState(subId: Int, state: Int, number: String? = null) {
+        val lastState = lastStateBySub[subId] ?: TelephonyManager.CALL_STATE_IDLE
+        RouteBotLog.d(
+            "call_state",
+            mapOf("sub" to subId, "from" to stateName(lastState), "to" to stateName(state))
+        )
         val callType = when {
             lastState == TelephonyManager.CALL_STATE_IDLE && state == TelephonyManager.CALL_STATE_RINGING ->
                 CallType.INCOMING
@@ -66,7 +96,7 @@ class CallStateMonitor @Inject constructor(
                 CallType.MISSED
             else -> null
         }
-        lastState = state
+        lastStateBySub[subId] = state
         callType ?: return
         scope.launch {
             agentApi.sendCall(
@@ -77,6 +107,7 @@ class CallStateMonitor @Inject constructor(
                     startedAt = Instant.now().toString()
                 )
             )
+            RouteBotLog.i("call_event_sent", mapOf("type" to callType.name, "sub" to subId))
         }
     }
 

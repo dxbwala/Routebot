@@ -76,7 +76,7 @@ nginx behavior ([`deploy/nginx/nginx.conf`](../deploy/nginx/nginx.conf)):
 - Port 443 terminates TLS with the certs above, sets HSTS + standard security headers
 - Rate-limits `/api/v1/auth/*` and `/api/v1/enrollment/*` (10 req/min per IP, burst 5) — returns `429`
 - Upgrades `/ws/` for agent WebSockets with extended timeouts
-- `client_max_body_size 64m` for media uploads
+- `client_max_body_size 64m` for log uploads
 
 The API also enforces its own per-IP rate limit on auth/enrollment endpoints as defense in depth in case it's ever reached directly.
 
@@ -98,9 +98,9 @@ MIGRATIONS_DIR=./migrations go run ./cmd/api
 
 Point the agent at `http://localhost:8080` in that mode (API exposed directly). Note: this bypasses nginx's TLS termination and rate limiting — use only for local development.
 
-## Media storage
+## Log upload storage
 
-Files land under `MEDIA_STORAGE_PATH` (Compose volume `/data/media`). Soft-delete is tracked in `media_uploads.deleted_at`. `media_type` includes `logs` (from the `upload_logs` remote command) alongside `audio`/`video`/`screenshot`.
+Files land under `MEDIA_STORAGE_PATH` (Compose volume `/data/media`). Soft-delete is tracked in `media_uploads.deleted_at`. Only `media_type=logs` is accepted (from the `upload_logs` remote command).
 
 ## Integration tests
 
@@ -119,8 +119,8 @@ CI runs this automatically with Postgres/Redis service containers — see [`.git
 - `android/app/src/debug/res/xml/network_security_config.xml` overrides this for **debug** builds only, allowing cleartext to a local/LAN API for development. This override is never included in a release build (verified by inspecting `merged_res/release`).
 - Certificate pinning: configure pins via the Settings screen (stored via `SecureStorageRepository.saveCertificatePins`); leave empty to rely on standard CA trust.
 - The local Room database is encrypted at rest with SQLCipher; the passphrase is generated once and stored in Android Keystore-backed `EncryptedSharedPreferences` (`DbPassphraseProvider`), never in plaintext.
-- Captured audio/video/screenshots are encrypted with an Android Keystore-backed AES-GCM key (hardware-backed where available) before upload, then deleted — the key itself never leaves the keystore or touches disk.
-- See [platform-limitations.md](architecture/platform-limitations.md) for the screenshot consent flow, video/CPU/SIM caveats, and SMS delivery report behavior.
+- See [platform-limitations.md](architecture/platform-limitations.md) for CPU/SIM caveats and SMS delivery report behavior.
+- Dual-SIM tray numbering (`1` = SIM 1, `2` = SIM 2): [sim-slots.md](architecture/sim-slots.md).
 
 ## Android release signing
 
@@ -194,7 +194,6 @@ input (`workflow_dispatch`) without pushing a tag first.
 - [x] Android release builds disable cleartext traffic
 - [x] Request signing + replay protection on all agent REST endpoints
 - [x] Local Room database encrypted at rest (SQLCipher, Keystore-backed passphrase)
-- [x] Captured media encrypted with a Keystore-backed key (not a plaintext key file)
 - [x] Crash reporting (uncaught exception handler → persisted + uploaded next launch)
 - [x] SMS delivery reports (real sent/delivered callbacks, not hardcoded status)
 - [x] Integration test suite (real HTTP + Postgres + Redis) running in CI

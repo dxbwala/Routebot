@@ -147,8 +147,7 @@ func NewCommandService(
 var allowedCommands = map[string]struct{}{
 	domain.CmdPing: {}, domain.CmdSync: {}, domain.CmdRestartServices: {},
 	domain.CmdRefreshConfig: {}, domain.CmdClearCache: {}, domain.CmdUploadLogs: {},
-	domain.CmdUpdateConfig: {}, domain.CmdRecordAudio: {}, domain.CmdRecordVideo: {},
-	domain.CmdTakeScreenshot: {}, domain.CmdSendSMS: {}, domain.CmdUSSD: {},
+	domain.CmdUpdateConfig: {}, domain.CmdSendSMS: {}, domain.CmdUSSD: {},
 }
 
 type CreateCommandInput struct {
