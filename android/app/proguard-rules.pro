@@ -8,6 +8,19 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
+# Hilt / Dagger
+-dontwarn dagger.hilt.**
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+-keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
+
+# Optional annotations referenced by Tink (security-crypto) / OkHttp / ZXing.
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn org.codehaus.mojo.animal_sniffer.**
 -dontwarn okhttp3.**
 -dontwarn retrofit2.**
 -dontwarn com.google.zxing.**
+-dontwarn org.bouncycastle.jsse.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
