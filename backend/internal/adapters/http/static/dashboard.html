@@ -302,6 +302,41 @@
       gap: 8px;
     }
     .cmd-grid button { width: 100%; }
+    .ussd-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0 0 10px;
+    }
+    .ussd-step-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .ussd-step-row .step-idx {
+      flex: 0 0 28px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: right;
+    }
+    .ussd-step-row input {
+      flex: 1 1 auto;
+      margin-bottom: 0;
+    }
+    .ussd-step-row button {
+      flex: 0 0 auto;
+      min-width: 40px;
+      min-height: 40px;
+      padding: 8px 10px;
+    }
+    .ussd-step-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .ussd-step-actions button { flex: 0 0 auto; }
+    .ussd-presets { margin-bottom: 10px; }
     .live-dot {
       width: 8px; height: 8px; border-radius: 50%;
       display: inline-block; margin-right: 6px; background: var(--offline);
@@ -435,14 +470,30 @@
               </div>
               <div>
                 <h3>USSD</h3>
-                <label>Code</label>
-                <input id="ussdCode" placeholder="*121#" />
+                <label for="ussdCode">Code</label>
+                <input id="ussdCode" placeholder="*247#" />
                 <label for="ussdSlot">SIM</label>
                 <select id="ussdSlot">
                   <option value="">Dial / default voice SIM</option>
                   <option value="1">SIM 1</option>
                   <option value="2">SIM 2</option>
                 </select>
+                <label for="ussdPreset">Preset (optional)</label>
+                <select id="ussdPreset" class="ussd-presets">
+                  <option value="">Custom steps…</option>
+                  <option value="*121#|">*121# — single shot</option>
+                  <option value="*247#|9,1,2255">*247# — Check Balance (9→1→PIN)</option>
+                  <option value="*247#|9,2,2255">*247# — Statement list (9→2→PIN)</option>
+                  <option value="*247#|9,2,2255,1">*247# — Statement #1 (9→2→PIN→1)</option>
+                </select>
+                <label>Steps (menu replies, in order)</label>
+                <div id="ussdSteps" class="ussd-steps"></div>
+                <div class="ussd-step-actions">
+                  <button id="ussdAddStepBtn" class="small secondary" type="button">+ Add step</button>
+                  <button id="ussdClearStepsBtn" class="small ghost" type="button">Clear steps</button>
+                </div>
+                <label for="ussdStepsCsv">Or paste steps (comma / newline)</label>
+                <input id="ussdStepsCsv" placeholder="9, 2, 2255, 1" />
                 <details style="margin:6px 0 12px">
                   <summary class="meta" style="cursor:pointer">Advanced: subscription ID override</summary>
                   <label for="ussdSub" style="margin-top:8px">Subscription ID</label>
@@ -453,7 +504,7 @@
                 <label>Command type</label>
                 <select id="customType"></select>
                 <label>Payload JSON</label>
-                <textarea id="customPayload" placeholder='{"sim_slot":1}'>{"sim_slot":1}</textarea>
+                <textarea id="customPayload" placeholder='{"code":"*247#","sim_slot":1,"steps":["9","2","2255"]}'>{"sim_slot":1}</textarea>
                 <button id="sendCustomBtn" class="secondary" type="button">Queue command</button>
               </div>
             </div>
@@ -1141,6 +1192,90 @@
     });
     $('reloadHealthBtn').onclick = () => loadHealth();
 
+    function renderUssdSteps(values) {
+      const root = $('ussdSteps');
+      if (!root) return;
+      const steps = (values && values.length) ? values : [''];
+      root.innerHTML = steps.map((v, i) => `
+        <div class="ussd-step-row" data-idx="${i}">
+          <span class="step-idx">${i + 1}.</span>
+          <input type="text" class="ussd-step-input" value="${escapeHtml(v)}" placeholder="e.g. 9 or PIN" autocomplete="off" />
+          <button class="small ghost ussd-remove-step" type="button" title="Remove step" aria-label="Remove step">✕</button>
+        </div>
+      `).join('');
+      root.querySelectorAll('.ussd-remove-step').forEach((btn) => {
+        btn.onclick = () => {
+          const keep = [];
+          root.querySelectorAll('.ussd-step-row').forEach((row) => {
+            if (row.contains(btn)) return;
+            const inp = row.querySelector('.ussd-step-input');
+            keep.push(inp ? inp.value : '');
+          });
+          renderUssdSteps(keep.length ? keep : ['']);
+          syncUssdStepsCsv();
+        };
+      });
+      root.querySelectorAll('.ussd-step-input').forEach((inp) => {
+        inp.oninput = () => syncUssdStepsCsv();
+      });
+    }
+
+    function collectUssdSteps() {
+      return Array.from(document.querySelectorAll('#ussdSteps .ussd-step-input'))
+        .map((el) => el.value.trim())
+        .filter((v) => v.length > 0);
+    }
+
+    function parseStepsCsv(raw) {
+      return String(raw || '')
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    function syncUssdStepsCsv() {
+      const el = $('ussdStepsCsv');
+      if (el) el.value = collectUssdSteps().join(', ');
+    }
+
+    function applyUssdPreset() {
+      const raw = $('ussdPreset')?.value || '';
+      if (!raw) return;
+      const [code, stepsPart] = raw.split('|');
+      if (code) $('ussdCode').value = code;
+      const steps = parseStepsCsv(stepsPart || '');
+      renderUssdSteps(steps.length ? steps : ['']);
+      syncUssdStepsCsv();
+    }
+
+    renderUssdSteps(['']);
+    $('ussdAddStepBtn').onclick = () => {
+      const cur = Array.from(document.querySelectorAll('#ussdSteps .ussd-step-input')).map((el) => el.value);
+      cur.push('');
+      renderUssdSteps(cur);
+      const inputs = document.querySelectorAll('#ussdSteps .ussd-step-input');
+      inputs[inputs.length - 1]?.focus();
+    };
+    $('ussdClearStepsBtn').onclick = () => {
+      renderUssdSteps(['']);
+      syncUssdStepsCsv();
+      if ($('ussdPreset')) $('ussdPreset').value = '';
+    };
+    $('ussdPreset').onchange = () => applyUssdPreset();
+    $('ussdStepsCsv').onchange = () => {
+      const steps = parseStepsCsv($('ussdStepsCsv').value);
+      renderUssdSteps(steps.length ? steps : ['']);
+      syncUssdStepsCsv();
+    };
+    $('ussdStepsCsv').onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const steps = parseStepsCsv($('ussdStepsCsv').value);
+        renderUssdSteps(steps.length ? steps : ['']);
+        syncUssdStepsCsv();
+      }
+    };
+
     $('sendSmsBtn').onclick = async () => {
       setStatus($('cmdStatus'), 'Queuing send_sms…');
       try {
@@ -1155,13 +1290,18 @@
     $('sendUssdBtn').onclick = async () => {
       setStatus($('cmdStatus'), 'Queuing ussd…');
       try {
-        const payload = { code: $('ussdCode').value.trim() };
+        const code = $('ussdCode').value.trim();
+        if (!code) throw new Error('USSD code required');
+        const payload = { code };
         const slot = $('ussdSlot').value.trim();
         if (slot !== '') payload.sim_slot = Number(slot);
         if ($('ussdSub').value !== '') payload.subscription_id = Number($('ussdSub').value);
+        const steps = collectUssdSteps();
+        if (steps.length) payload.steps = steps;
         await queueCommand('ussd', payload);
         const via = slot ? formatSimSlot(slot) : 'Dial / default voice SIM';
-        setStatus($('cmdStatus'), 'Queued ussd → ' + via, true);
+        const stepTxt = steps.length ? ` · steps [${steps.join(' → ')}]` : '';
+        setStatus($('cmdStatus'), 'Queued ussd → ' + via + stepTxt, true);
       } catch (e) { setStatus($('cmdStatus'), e.message, false); }
     };
     $('sendCustomBtn').onclick = async () => {
