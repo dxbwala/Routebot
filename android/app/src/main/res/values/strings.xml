@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RouteBot</string>
+    <string name="agent_channel_name">RouteBot Agent</string>
+    <string name="agent_channel_desc">Foreground agent connectivity and sync</string>
+    <string name="agent_notification_title">RouteBot Agent Active</string>
+    <string name="agent_notification_text">Connected to RouteDNS</string>
+    <string name="notification_listener_label">RouteBot Notification Listener</string>
+</resources>
