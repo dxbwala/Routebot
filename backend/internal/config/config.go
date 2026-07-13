@@ -30,6 +30,11 @@ type Config struct {
 	RedisDB                  int
 	HeartbeatIntervalSeconds int
 	OfflineThresholdSeconds  int
+
+	// Optional bootstrap admin (created/updated on API startup).
+	AdminEmail       string
+	AdminPassword    string
+	AdminDisplayName string
 }
 
 // Load reads configuration from the environment (.env optional).
@@ -62,6 +67,9 @@ func Load() (*Config, error) {
 		RedisDB:                  getEnvInt("REDIS_DB", 0),
 		HeartbeatIntervalSeconds: getEnvInt("HEARTBEAT_INTERVAL_SECONDS", 30),
 		OfflineThresholdSeconds:  getEnvInt("OFFLINE_THRESHOLD_SECONDS", 90),
+		AdminEmail:               getEnv("ADMIN_EMAIL", ""),
+		AdminPassword:            getEnv("ADMIN_PASSWORD", ""),
+		AdminDisplayName:         getEnv("ADMIN_DISPLAY_NAME", "Admin"),
 	}
 
 	cfg.PostgresDSN = fmt.Sprintf(

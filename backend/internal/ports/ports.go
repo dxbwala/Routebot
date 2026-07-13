@@ -13,6 +13,8 @@ type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
+	// UpsertByEmail inserts a user or updates password/display/role/active for an existing email.
+	UpsertByEmail(ctx context.Context, user *domain.User) error
 }
 
 type RefreshTokenRepository interface {

@@ -35,27 +35,44 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Assemble debug + minified release APK
-        run: ./gradlew :app:assembleDebug :app:assembleRelease --stacktrace
+      - name: Assemble debug + minified release APKs (legacy + modern)
+        run: |
+          ./gradlew \
+            :app:assembleLegacyDebug :app:assembleModernDebug \
+            :app:assembleLegacyRelease :app:assembleModernRelease \
+            --stacktrace
 
       - name: Report APK sizes
         run: |
           echo "## APK sizes" >> "$GITHUB_STEP_SUMMARY"
-          for f in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk; do
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| APK | Size | Notes |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          for f in app/build/outputs/apk/*/*/*.apk; do
             [ -f "$f" ] || continue
             size=$(du -h "$f" | cut -f1)
             bytes=$(wc -c < "$f" | tr -d ' ')
-            echo "- \`$(basename "$f")\`: **$size** ($bytes bytes)" | tee -a "$GITHUB_STEP_SUMMARY"
+            name=$(basename "$f")
+            note=""
+            case "$name" in
+              *legacy*) note="Older 32-bit ARM phones (armeabi-v7a)" ;;
+              *modern*) note="Current 64-bit phones (arm64-v8a)" ;;
+            esac
+            echo "- \`$name\`: **$size** ($bytes bytes) — $note" | tee -a "$GITHUB_STEP_SUMMARY"
           done
 
-      - name: Upload debug APK
+      - name: Upload debug APKs
         uses: actions/upload-artifact@v4
         with:
-          name: routebot-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: routebot-debug-apks
+          path: |
+            android/app/build/outputs/apk/legacy/debug/*.apk
+            android/app/build/outputs/apk/modern/debug/*.apk
 
-      - name: Upload release APK (unsigned if no keystore secrets)
+      - name: Upload release APKs (unsigned if no keystore secrets)
         uses: actions/upload-artifact@v4
         with:
-          name: routebot-release-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          name: routebot-release-apks
+          path: |
+            android/app/build/outputs/apk/legacy/release/*.apk
+            android/app/build/outputs/apk/modern/release/*.apk

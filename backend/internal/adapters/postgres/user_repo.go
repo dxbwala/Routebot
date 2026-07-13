@@ -23,6 +23,21 @@ func (r *UserRepo) Create(ctx context.Context, user *domain.User) error {
 		Scan(&user.ID, &user.IsActive, &user.CreatedAt, &user.UpdatedAt)
 }
 
+func (r *UserRepo) UpsertByEmail(ctx context.Context, user *domain.User) error {
+	return r.pool.QueryRow(ctx, `
+		INSERT INTO users (email, password_hash, display_name, role, is_active)
+		VALUES ($1, $2, $3, $4, TRUE)
+		ON CONFLICT (email) DO UPDATE SET
+			password_hash = EXCLUDED.password_hash,
+			display_name = EXCLUDED.display_name,
+			role = EXCLUDED.role,
+			is_active = TRUE,
+			updated_at = NOW()
+		RETURNING id, is_active, created_at, updated_at
+	`, user.Email, user.PasswordHash, user.DisplayName, user.Role).
+		Scan(&user.ID, &user.IsActive, &user.CreatedAt, &user.UpdatedAt)
+}
+
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	u := &domain.User{}
 	err := r.pool.QueryRow(ctx, `

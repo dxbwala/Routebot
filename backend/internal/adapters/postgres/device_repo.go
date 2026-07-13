@@ -3,9 +3,11 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/routedns/routebot/backend/internal/domain"
 )
@@ -136,7 +138,13 @@ func (r *HeartbeatRepo) LatestByDevice(ctx context.Context, deviceID uuid.UUID) 
 		&hb.ID, &hb.DeviceID, &hb.BatteryLevel, &hb.IsCharging, &hb.StorageFreeMB, &hb.RAMFreeMB, &hb.CPUUsage,
 		&hb.NetworkType, &hb.WifiSSID, &hb.SignalStrength, &hb.SIMInfo, &hb.Payload, &hb.ReportedAt,
 	)
-	return hb, err
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return hb, nil
 }
 
 func (r *HeartbeatRepo) ListByDevice(ctx context.Context, deviceID uuid.UUID, limit int) ([]domain.DeviceHeartbeat, error) {

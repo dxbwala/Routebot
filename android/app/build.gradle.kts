@@ -31,6 +31,12 @@ val hasReleaseSigning = !releaseKeystorePath.isNullOrBlank() &&
     !releaseKeyAlias.isNullOrBlank() &&
     !releaseKeyPassword.isNullOrBlank()
 
+// Shared base version for multi-APK / multi-flavor releases (CI passes -ProutebotVersion*).
+val routebotVersionCodeBase =
+    (project.findProperty("routebotVersionCode") as String?)?.toIntOrNull() ?: 1
+val routebotVersionNameBase =
+    project.findProperty("routebotVersionName") as String? ?: "1.0.0"
+
 android {
     namespace = "com.routedns.routebot"
     compileSdk = 35
@@ -40,11 +46,39 @@ android {
         applicationId = "com.routedns.routebot"
         minSdk = 26
         targetSdk = 35
-        versionCode = (project.findProperty("routebotVersionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = project.findProperty("routebotVersionName") as String? ?: "1.0.0"
-        // Phone APKs only — drops x86/x86_64 emulator ABIs that bloated the universal APK.
-        ndk {
-            abiFilters += listOf("arm64-v8a")
+        versionCode = routebotVersionCodeBase
+        versionName = routebotVersionNameBase
+    }
+
+    /**
+     * Separate installable APKs for device generations while keeping one codebase targeting
+     * the latest Android SDK (compile/target 35):
+     *
+     * - legacy  → older 32-bit ARM phones (armeabi-v7a), Android 8.0+ (API 26)
+     * - modern  → current 64-bit phones (arm64-v8a), Android 8.0+ (API 26)  [default]
+     *
+     * versionCode stays unique per flavor so side-by-side Play / sideload updates work.
+     */
+    flavorDimensions += "device"
+    productFlavors {
+        create("legacy") {
+            dimension = "device"
+            versionNameSuffix = "-legacy"
+            versionCode = routebotVersionCodeBase * 10 + 1
+            ndk {
+                abiFilters.clear()
+                abiFilters += listOf("armeabi-v7a")
+            }
+        }
+        create("modern") {
+            dimension = "device"
+            isDefault = true
+            versionNameSuffix = "-modern"
+            versionCode = routebotVersionCodeBase * 10 + 2
+            ndk {
+                abiFilters.clear()
+                abiFilters += listOf("arm64-v8a")
+            }
         }
     }
 
